@@ -16,6 +16,14 @@ interface ProjectContext {
   lastAccessed: number;
 }
 
+/** Thrown when searching a project that has never been indexed. */
+export class NoIndexError extends Error {
+  constructor(projectPath: string) {
+    super(`No index found for: ${projectPath}\nRun 'init' to create the vector index.`);
+    this.name = "NoIndexError";
+  }
+}
+
 const projectContexts = new Map<string, ProjectContext>();
 const pendingInits = new Map<string, Promise<ProjectContext>>();
 
@@ -57,15 +65,17 @@ export async function getProjectContext(projectPath: string): Promise<ProjectCon
 async function initProjectContext(normalized: string): Promise<ProjectContext> {
   logger.info("Creating new project context", { projectPath: normalized });
 
-  const config = await loadProjectConfig(normalized);
-  const db = new VectorDB(normalized, 0);
-  await db.connect();
-
-  const metadata = await db.loadMetadata();
-  if (metadata) {
-    config.embedding.provider = metadata.embeddingProvider as any;
-    config.embedding.model = metadata.embeddingModel;
+  // loadMetadata only reads metadata.json, so no connection (which would create
+  // the database directory) is needed to find out whether an index exists
+  const metadata = await new VectorDB(normalized, 0).loadMetadata();
+  if (!metadata) {
+    // Opening tables here would create empty placeholder tables for a project that was never indexed
+    throw new NoIndexError(normalized);
   }
+
+  const config = await loadProjectConfig(normalized);
+  config.embedding.provider = metadata.embeddingProvider as any;
+  config.embedding.model = metadata.embeddingModel;
 
   const embedder = await createEmbeddingProvider(config.embedding);
 

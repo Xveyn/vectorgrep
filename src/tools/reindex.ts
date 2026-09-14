@@ -6,11 +6,15 @@ import { VectorDB } from "../db/connection.js";
 import { Indexer } from "../indexing/indexer.js";
 import { invalidateProjectContext } from "../context.js";
 import { normalizeProjectPath } from "../utils/paths.js";
+import { withProjectWriteLock } from "../utils/project-lock.js";
 import { logger } from "../utils/logger.js";
 
 export async function handleReindex(input: ReindexInput): Promise<string> {
   const projectPath = normalizeProjectPath(input.projectPath);
+  return withProjectWriteLock(projectPath, () => reindex(projectPath));
+}
 
+async function reindex(projectPath: string): Promise<string> {
   try {
     await invalidateProjectContext(projectPath);
 
@@ -38,5 +42,8 @@ export async function handleReindex(input: ReindexInput): Promise<string> {
   } catch (error) {
     logger.error("reindex failed", { error: String(error) });
     return `Error during reindex: ${error}`;
+  } finally {
+    // A search that started just before the write may have cached tables from before it
+    await invalidateProjectContext(projectPath);
   }
 }
