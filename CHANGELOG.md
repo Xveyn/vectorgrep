@@ -51,6 +51,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - In git mode, default exclude patterns never matched, `include` was ignored,
   non-ASCII filenames were skipped, and a failing `git ls-files` produced an empty
   index instead of falling back to glob (#27).
+- `init` and `reindex` silently discarded the entire index while reporting success
+  when another MCP server process recreated the tables during indexing; searches
+  then returned nothing (#47).
 
 ### Upgrade notes
 - Run `reindex` once after upgrading. Existing indexes may contain duplicate or
