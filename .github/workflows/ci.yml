@@ -44,4 +44,22 @@ jobs:
         run: npm run build
 
       - name: Test
+        if: matrix.node-version != '22.x'
         run: npm test
+
+      # Coverage is measured once, on Node 22. The thresholds in vitest.config.ts
+      # fail this step when coverage drops below the floor.
+      - name: Test with coverage
+        if: matrix.node-version == '22.x'
+        run: npm run test:coverage
+
+      - name: Coverage summary
+        if: always() && matrix.node-version == '22.x' && hashFiles('coverage/coverage-summary.json') != ''
+        run: |
+          node -e '
+            const total = require("./coverage/coverage-summary.json").total;
+            const rows = ["statements", "branches", "functions", "lines"].map(
+              (metric) => `| ${metric} | ${total[metric].pct}% | ${total[metric].covered} / ${total[metric].total} |`
+            );
+            console.log(["### Coverage", "", "| Metric | Covered | Count |", "|---|---|---|", ...rows].join("\n"));
+          ' | tee -a "$GITHUB_STEP_SUMMARY"
