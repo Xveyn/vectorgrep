@@ -22,7 +22,7 @@
     "url": "https://github.com/Xveyn/codebase-semantic-search/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
@@ -55,12 +55,10 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
     "@huggingface/transformers": "^4.2.0",
     "@lancedb/lancedb": "^0.15.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "apache-arrow": "^18.1.0",
-    "chokidar": "^5.0.0",
     "glob": "^13.0.6",
     "minimatch": "^10.2.6",
     "simple-git": "^3.27.0",
