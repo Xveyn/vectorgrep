@@ -68,6 +68,9 @@ for the full list. The most important ones:
   as a string literal, so the filter silently never matches.
 - **Vectors read from LanceDB** are Arrow `Vector`s, not arrays — convert with
   `Array.from()` before reusing them.
+- **LanceDB queries return only 10 rows** unless a limit is set — `table.query()`
+  as well as vector search. Use `queryAllRows` from `src/db/operations.ts` to
+  read every matching row.
 - **Filter placeholder records** (`__placeholder__`) when reading empty tables.
 - **Logging goes to stderr only** — `stdout` is reserved for the MCP protocol.
 - Run any user-controlled value through the helpers in `src/utils/sanitize.ts`
