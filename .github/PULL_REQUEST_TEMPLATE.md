@@ -15,6 +15,7 @@
 - [ ] `npm run build` passes
 - [ ] `npm test` passes
 - [ ] Added/updated tests where appropriate
+- [ ] Raised the coverage floor in `vitest.config.ts` if coverage went up (`npm run test:coverage`)
 - [ ] Followed the conventions in `CONTRIBUTING.md` / `CLAUDE.md`
 - [ ] Updated documentation if behaviour changed
 
