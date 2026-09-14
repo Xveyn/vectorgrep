@@ -18,6 +18,7 @@ export async function handleSearchSymbols(input: SearchSymbolsInput): Promise<st
   } catch (error) {
     if (error instanceof NoIndexError) return error.message;
     logger.error("search_symbols failed", { error: String(error) });
-    return `Error searching symbols: ${error}`;
+    // Thrown, not returned: the MCP SDK turns it into a result with isError: true
+    throw new Error(`Error searching symbols: ${error}`);
   }
 }

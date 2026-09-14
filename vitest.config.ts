@@ -12,10 +12,10 @@ export default defineConfig({
       // Floor: measured coverage rounded down (CI and local agree). Raise it when
       // tests are added; a drop below fails `npm run test:coverage` in CI.
       thresholds: {
-        statements: 85,
-        branches: 75,
-        functions: 91,
-        lines: 86,
+        statements: 87,
+        branches: 76,
+        functions: 93,
+        lines: 88,
       },
     },
   },

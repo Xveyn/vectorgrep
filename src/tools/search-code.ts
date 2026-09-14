@@ -18,6 +18,7 @@ export async function handleSearchCode(input: SearchCodeInput): Promise<string> 
   } catch (error) {
     if (error instanceof NoIndexError) return error.message;
     logger.error("search_code failed", { error: String(error) });
-    return `Error searching code: ${error}`;
+    // Thrown, not returned: the MCP SDK turns it into a result with isError: true
+    throw new Error(`Error searching code: ${error}`);
   }
 }

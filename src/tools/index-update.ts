@@ -61,7 +61,8 @@ async function updateIndex(projectPath: string): Promise<string> {
     ].join("\n");
   } catch (error) {
     logger.error("index_update failed", { error: String(error) });
-    return `Error during incremental update: ${error}`;
+    // Thrown, not returned: the MCP SDK turns it into a result with isError: true
+    throw new Error(`Error during incremental update: ${error}`);
   } finally {
     // Invalidate cached context so the next search picks up new data
     await invalidateProjectContext(projectPath);
