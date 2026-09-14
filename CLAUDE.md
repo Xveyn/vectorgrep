@@ -2,9 +2,15 @@
 
 ## Build & Test
 ```bash
-npm run build        # TypeScript kompilieren
-npx vitest run       # Alle Tests ausfuehren
+npm run build          # TypeScript kompilieren
+npx vitest run         # Alle Tests ausfuehren
+npm run test:coverage  # Tests mit Coverage (so laeuft es in der CI auf Node 22)
 ```
+
+### Coverage-Floor
+- Die CI bricht ab, wenn die Coverage unter die `thresholds` in `vitest.config.ts` faellt (Statements, Branches, Functions, Lines)
+- **Nach neuen Tests den Floor anheben**: `npm run test:coverage` laufen lassen und die vier Werte auf die gemessenen Prozent **abgerundet** setzen (z.B. 82.92 % -> 82). Im selben PR wie die Tests
+- Den Floor **nie senken**, um einen PR gruen zu bekommen — fehlende Tests nachziehen
 
 ## MCP Registration
 ```bash

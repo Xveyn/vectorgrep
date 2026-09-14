@@ -31,10 +31,18 @@ npm run build      # Compile TypeScript -> build/
 npm run dev        # Watch mode
 npm test           # Run the full test suite (vitest)
 npm run test:watch # Watch mode for tests
+npm run test:coverage # Tests with coverage, as CI runs them on Node 22
 ```
 
 The test suite uses a mock embedding provider and runs fully offline — no Ollama
 or network access required.
+
+### Coverage floor
+
+CI fails when coverage drops below the `thresholds` in `vitest.config.ts`. When
+your PR adds tests, run `npm run test:coverage` and raise the four thresholds to
+the measured percentages, **rounded down** (e.g. 82.92 % → 82), in the same PR.
+Never lower the floor to make a PR pass — add the missing tests instead.
 
 ## Pull Requests
 
