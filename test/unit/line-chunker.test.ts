@@ -42,4 +42,13 @@ describe("LineChunker", () => {
     expect(chunks[0].summary).toContain("src/hello.ts");
     expect(chunks[0].summary).toContain("typescript");
   });
+
+  it("terminates and covers every line when overlap >= maxChunkLines", async () => {
+    const content = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join("\n");
+    const chunks = await new LineChunker(10, 10).chunk("loop.ts", content, "typescript");
+
+    expect(chunks[0].startLine).toBe(1);
+    expect(chunks[chunks.length - 1].endLine).toBe(30);
+    expect(chunks.length).toBeLessThanOrEqual(30);
+  });
 });

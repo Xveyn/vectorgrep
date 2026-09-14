@@ -1,6 +1,27 @@
 import type { Chunker, CodeChunk } from "./chunker.js";
 import { hashString } from "../utils/hash.js";
 
+/**
+ * Split the inclusive, 1-based line range [firstLine, lastLine] into windows of
+ * at most maxLines lines that overlap by overlapLines.
+ */
+export function lineWindows(
+  firstLine: number,
+  lastLine: number,
+  maxLines: number,
+  overlapLines: number
+): Array<[number, number]> {
+  // An overlap of maxLines or more would never advance, so always move at least one line
+  const step = Math.max(1, maxLines - overlapLines);
+  const windows: Array<[number, number]> = [];
+
+  for (let start = firstLine; ; start += step) {
+    const end = Math.min(start + maxLines - 1, lastLine);
+    windows.push([start, end]);
+    if (end >= lastLine) return windows;
+  }
+}
+
 export class LineChunker implements Chunker {
   private maxChunkLines: number;
   private overlapLines: number;
@@ -12,27 +33,20 @@ export class LineChunker implements Chunker {
 
   async chunk(filePath: string, content: string, language: string): Promise<CodeChunk[]> {
     const lines = content.split("\n");
-    const chunks: CodeChunk[] = [];
+    return this.chunkLines(filePath, lines, 1, lines.length, language);
+  }
 
-    // Small files: single chunk
-    if (lines.length <= this.maxChunkLines) {
-      chunks.push(this.createChunk(filePath, lines, 1, lines.length, language));
-      return chunks;
-    }
-
-    // Sliding window with overlap
-    let start = 0;
-    while (start < lines.length) {
-      const end = Math.min(start + this.maxChunkLines, lines.length);
-      const chunkLines = lines.slice(start, end);
-
-      chunks.push(this.createChunk(filePath, chunkLines, start + 1, end, language));
-
-      if (end >= lines.length) break;
-      start = end - this.overlapLines;
-    }
-
-    return chunks;
+  /** Chunk lines firstLine..lastLine (1-based, inclusive) of a file's lines. */
+  chunkLines(
+    filePath: string,
+    lines: string[],
+    firstLine: number,
+    lastLine: number,
+    language: string
+  ): CodeChunk[] {
+    return lineWindows(firstLine, lastLine, this.maxChunkLines, this.overlapLines).map(
+      ([start, end]) => this.createChunk(filePath, lines.slice(start - 1, end), start, end, language)
+    );
   }
 
   private createChunk(

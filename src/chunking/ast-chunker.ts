@@ -1,10 +1,11 @@
 import type { Chunker, CodeChunk, SymbolType } from "./chunker.js";
 import { hashString } from "../utils/hash.js";
-import { LineChunker } from "./line-chunker.js";
+import { LineChunker, lineWindows } from "./line-chunker.js";
 import { getLanguageForFile } from "./languages.js";
 import { logger } from "../utils/logger.js";
 import { resolve, join } from "path";
 import { fileURLToPath } from "url";
+import { createRequire } from "module";
 
 // Tree-sitter node types that represent top-level symbols
 const SYMBOL_NODE_TYPES: Record<string, SymbolType> = {
@@ -42,6 +43,9 @@ const SYMBOL_NODE_TYPES: Record<string, SymbolType> = {
   program: "other",
 };
 
+/** Symbols whose nested declarations (e.g. methods) get their own chunks */
+const CONTAINER_TYPES = new Set<SymbolType>(["class", "module"]);
+
 let Parser: any = null;
 let parserInstance: any = null;
 const loadedLanguages = new Map<string, any>();
@@ -51,7 +55,8 @@ function findWasmDir(): string {
   // Look for tree-sitter-wasms/out directory
   // Works regardless of where the server is invoked from
   try {
-    const wasmPkg = require.resolve("tree-sitter-wasms/package.json");
+    // `require` doesn't exist in ESM; createRequire resolves from wherever the package is installed
+    const wasmPkg = createRequire(import.meta.url).resolve("tree-sitter-wasms/package.json");
     return join(wasmPkg, "..", "out");
   } catch {
     // Fallback: resolve relative to this file's location
@@ -114,9 +119,11 @@ async function loadLanguage(grammarName: string): Promise<any | null> {
 export class ASTChunker implements Chunker {
   private lineChunker: LineChunker;
   private maxChunkLines: number;
+  private overlapLines: number;
 
   constructor(maxChunkLines = 100, overlapLines = 10) {
     this.maxChunkLines = maxChunkLines;
+    this.overlapLines = overlapLines;
     this.lineChunker = new LineChunker(maxChunkLines, overlapLines);
   }
 
@@ -173,7 +180,7 @@ export class ASTChunker implements Chunker {
 
     this.walkNode(rootNode, filePath, lines, language, chunks, undefined);
 
-    return chunks;
+    return this.withGapChunks(chunks, filePath, lines, language);
   }
 
   private walkNode(
@@ -201,44 +208,23 @@ export class ASTChunker implements Chunker {
       const endLine = child.endPosition.row + 1;
       const symbolName = this.getSymbolName(child);
 
-      if (endLine - startLine + 1 > this.maxChunkLines) {
-        // Create header chunk for the symbol signature
-        const headerEnd = Math.min(startLine + 5, endLine);
-        const headerContent = lines.slice(startLine - 1, headerEnd).join("\n");
-
-        chunks.push({
-          id: hashString(`${filePath}:${startLine}:${headerEnd}`),
-          filePath,
-          startLine,
-          endLine: headerEnd,
-          content: headerContent,
-          symbolName,
-          symbolType,
-          parentSymbol: parentName,
-          language,
-          summary: this.buildSummary(filePath, symbolName, symbolType, headerContent, language, startLine, headerEnd),
-        });
-
-        // Recurse into children for nested symbols (methods inside classes)
-        this.walkNode(child, filePath, lines, language, chunks, symbolName);
-      } else {
-        const content = lines.slice(startLine - 1, endLine).join("\n");
-        chunks.push({
-          id: hashString(`${filePath}:${startLine}:${endLine}`),
-          filePath,
-          startLine,
-          endLine,
-          content,
-          symbolName,
-          symbolType,
-          parentSymbol: parentName,
-          language,
-          summary: this.buildSummary(filePath, symbolName, symbolType, content, language, startLine, endLine),
-        });
+      if (endLine - startLine + 1 <= this.maxChunkLines) {
+        chunks.push(this.symbolChunk(filePath, lines, startLine, endLine, symbolName, symbolType, parentName, language));
 
         // Also recurse for nested symbols (e.g. methods inside class)
-        if (child.childCount > 0 && (symbolType === "class" || symbolType === "module")) {
+        if (child.childCount > 0 && CONTAINER_TYPES.has(symbolType)) {
           this.walkNode(child, filePath, lines, language, chunks, symbolName);
+        }
+      } else if (CONTAINER_TYPES.has(symbolType)) {
+        // Oversized class/module: header chunk for the signature plus nested symbols;
+        // whatever they don't cover (fields, etc.) is gap-filled afterwards
+        const headerEnd = Math.min(startLine + 5, endLine);
+        chunks.push(this.symbolChunk(filePath, lines, startLine, headerEnd, symbolName, symbolType, parentName, language));
+        this.walkNode(child, filePath, lines, language, chunks, symbolName);
+      } else {
+        // Oversized function etc.: split into windows so the whole body stays indexed under the symbol
+        for (const [start, end] of lineWindows(startLine, endLine, this.maxChunkLines, this.overlapLines)) {
+          chunks.push(this.symbolChunk(filePath, lines, start, end, symbolName, symbolType, parentName, language));
         }
       }
     }
@@ -305,6 +291,69 @@ export class ASTChunker implements Chunker {
     }
 
     return undefined;
+  }
+
+  private symbolChunk(
+    filePath: string,
+    lines: string[],
+    startLine: number,
+    endLine: number,
+    symbolName: string | undefined,
+    symbolType: SymbolType,
+    parentName: string | undefined,
+    language: string
+  ): CodeChunk {
+    const content = lines.slice(startLine - 1, endLine).join("\n");
+    return {
+      // Type and name disambiguate symbols sharing a line range (e.g. a one-line class and its method)
+      id: hashString(`${filePath}:${startLine}:${endLine}:${symbolType}:${symbolName ?? ""}`),
+      filePath,
+      startLine,
+      endLine,
+      content,
+      symbolName,
+      symbolType,
+      parentSymbol: parentName,
+      language,
+      summary: this.buildSummary(filePath, symbolName, symbolType, content, language, startLine, endLine),
+    };
+  }
+
+  /**
+   * Line-chunk code that no symbol chunk covers (top-level statements, class fields, ...)
+   * so every non-blank line ends up searchable.
+   */
+  private withGapChunks(
+    chunks: CodeChunk[],
+    filePath: string,
+    lines: string[],
+    language: string
+  ): CodeChunk[] {
+    const covered = new Array<boolean>(lines.length + 1).fill(false);
+    for (const chunk of chunks) {
+      for (let line = chunk.startLine; line <= chunk.endLine; line++) covered[line] = true;
+    }
+    const isBlank = (line: number) => lines[line - 1].trim().length === 0;
+
+    const gapChunks: CodeChunk[] = [];
+    let line = 1;
+    while (line <= lines.length) {
+      if (covered[line] || isBlank(line)) {
+        line++;
+        continue;
+      }
+
+      // Extend the gap up to the next covered line, trimming trailing blank lines
+      let gapEnd = line;
+      for (let next = line + 1; next <= lines.length && !covered[next]; next++) {
+        if (!isBlank(next)) gapEnd = next;
+      }
+
+      gapChunks.push(...this.lineChunker.chunkLines(filePath, lines, line, gapEnd, language));
+      line = gapEnd + 1;
+    }
+
+    return [...chunks, ...gapChunks].sort((a, b) => a.startLine - b.startLine);
   }
 
   private buildSummary(
