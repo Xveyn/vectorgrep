@@ -47,23 +47,18 @@ export class VectorDB {
       this.chunksTable = await conn.createTable("chunks", initialData);
     } else {
       // Create with empty placeholder
-      const empty: ChunkRecord = {
-        id: "__placeholder__",
-        vector: new Array(this.dimensions).fill(0),
-        filePath: "",
-        startLine: 0,
-        endLine: 0,
-        content: "",
-        symbolName: "",
-        symbolType: "",
-        language: "",
-        parentSymbol: "",
-        summary: "",
-        fileHash: "",
-        indexedAt: new Date().toISOString(),
-      };
-      this.chunksTable = await conn.createTable("chunks", [empty]);
+      this.chunksTable = await conn.createTable("chunks", [this.placeholderChunk()]);
     }
+    return this.chunksTable;
+  }
+
+  /**
+   * Replace the chunks table with `records`. Unlike getOrCreateChunksTable this always
+   * writes, even if the table exists again (e.g. recreated by another server process).
+   */
+  async overwriteChunksTable(records: ChunkRecord[]): Promise<Table> {
+    const rows = records.length > 0 ? records : [this.placeholderChunk()];
+    this.chunksTable = await this.getConnection().createTable("chunks", rows, { mode: "overwrite" });
     return this.chunksTable;
   }
 
@@ -78,18 +73,46 @@ export class VectorDB {
     } else if (initialData && initialData.length > 0) {
       this.filesTable = await conn.createTable("files", initialData);
     } else {
-      const empty: FileRecord = {
-        filePath: "__placeholder__",
-        vector: new Array(this.dimensions).fill(0),
-        language: "",
-        fileHash: "",
-        chunkCount: 0,
-        symbolCount: 0,
-        indexedAt: new Date().toISOString(),
-      };
-      this.filesTable = await conn.createTable("files", [empty]);
+      this.filesTable = await conn.createTable("files", [this.placeholderFile()]);
     }
     return this.filesTable;
+  }
+
+  /** Replace the files table with `records`; see overwriteChunksTable. */
+  async overwriteFilesTable(records: FileRecord[]): Promise<Table> {
+    const rows = records.length > 0 ? records : [this.placeholderFile()];
+    this.filesTable = await this.getConnection().createTable("files", rows, { mode: "overwrite" });
+    return this.filesTable;
+  }
+
+  private placeholderChunk(): ChunkRecord {
+    return {
+      id: "__placeholder__",
+      vector: new Array(this.dimensions).fill(0),
+      filePath: "",
+      startLine: 0,
+      endLine: 0,
+      content: "",
+      symbolName: "",
+      symbolType: "",
+      language: "",
+      parentSymbol: "",
+      summary: "",
+      fileHash: "",
+      indexedAt: new Date().toISOString(),
+    };
+  }
+
+  private placeholderFile(): FileRecord {
+    return {
+      filePath: "__placeholder__",
+      vector: new Array(this.dimensions).fill(0),
+      language: "",
+      fileHash: "",
+      chunkCount: 0,
+      symbolCount: 0,
+      indexedAt: new Date().toISOString(),
+    };
   }
 
   async dropAllTables(): Promise<void> {
