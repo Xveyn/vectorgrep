@@ -5,6 +5,7 @@ import { logger } from "../utils/logger.js";
 
 export interface SearchResult {
   record: ChunkRecord | FileRecord;
+  /** Cosine distance (0 = same direction, 2 = opposite). LanceDB's default, squared L2, isn't used. */
   distance: number;
 }
 
@@ -26,7 +27,7 @@ export async function searchChunks(
   limit: number,
   filter?: string
 ): Promise<SearchResult[]> {
-  let query = table.search(queryVector).limit(limit);
+  let query = table.vectorSearch(queryVector).distanceType("cosine").limit(limit);
   if (filter) {
     query = query.where(filter);
   }
@@ -56,7 +57,7 @@ export async function searchFiles(
   queryVector: number[],
   limit: number
 ): Promise<SearchResult[]> {
-  const results = await table.search(queryVector).limit(limit).toArray();
+  const results = await table.vectorSearch(queryVector).distanceType("cosine").limit(limit).toArray();
   return results.map((row: any) => ({
     record: {
       filePath: row.filePath,

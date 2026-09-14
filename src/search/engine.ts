@@ -13,6 +13,14 @@ const MIN_SCORE_THRESHOLD = 0.05;
 /** How many extra candidates to fetch for re-ranking */
 const RERANK_MULTIPLIER = 3;
 
+/**
+ * Cosine distance -> similarity in [0, 1], on the same scale as the normalized BM25 score.
+ * Negative similarities (pointing away from the query) count as no similarity.
+ */
+function vectorSimilarity(distance: number): number {
+  return Math.max(0, 1 - distance);
+}
+
 export interface CodeSearchResult {
   filePath: string;
   startLine: number;
@@ -91,7 +99,7 @@ export class SearchEngine {
         symbolName: chunk.symbolName,
         symbolType: chunk.symbolType,
         language: chunk.language,
-        vectorScore: 1 - (r.distance || 0),
+        vectorScore: vectorSimilarity(r.distance),
         // Searchable text: content + symbol name + file path
         searchText: `${chunk.content} ${chunk.symbolName} ${chunk.filePath}`,
       };
@@ -126,7 +134,7 @@ export class SearchEngine {
           language: file.language,
           chunkCount: file.chunkCount,
           symbolCount: file.symbolCount,
-          vectorScore: 1 - (r.distance || 0),
+          vectorScore: vectorSimilarity(r.distance),
           searchText: file.filePath,
         };
       });
@@ -329,7 +337,7 @@ export class SearchEngine {
           symbolType: chunk.symbolType,
           content: chunk.content,
           language: chunk.language,
-          vectorScore: 1 - (r.distance || 0),
+          vectorScore: vectorSimilarity(r.distance),
           searchText: `${chunk.symbolName} ${chunk.symbolType} ${chunk.content}`,
           exactBoost: 0,
         });

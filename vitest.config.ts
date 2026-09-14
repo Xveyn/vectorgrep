@@ -13,7 +13,7 @@ export default defineConfig({
       // tests are added; a drop below fails `npm run test:coverage` in CI.
       thresholds: {
         statements: 85,
-        branches: 73,
+        branches: 75,
         functions: 91,
         lines: 86,
       },
