@@ -15,19 +15,19 @@ export async function isGitRepo(projectPath: string): Promise<boolean> {
   }
 }
 
-export async function getTrackedFiles(projectPath: string): Promise<string[]> {
+/** Tracked plus untracked-but-not-ignored files, or null if git fails. */
+export async function getTrackedFiles(projectPath: string): Promise<string[] | null> {
   try {
     const git = getGit(projectPath);
-    const result = await git.raw(["ls-files", "--cached", "--others", "--exclude-standard"]);
-    return result
-      .split("\n")
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0);
+    // -z: NUL-separated and unquoted, so non-ASCII paths aren't escaped as "gr\303\266..."
+    const result = await git.raw(["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+    // Unmerged paths are listed once per stage
+    return [...new Set(result.split("\0").filter((f) => f.length > 0))];
   } catch (error) {
     logger.warn("Failed to get git tracked files, falling back to glob", {
       error: String(error),
     });
-    return [];
+    return null;
   }
 }
 
