@@ -99,7 +99,7 @@ export async function queryChunksByFilter(
 }
 
 export async function deleteByFilePath(table: Table, filePath: string): Promise<void> {
-  await table.delete(`"filePath" = '${escapeSqlString(filePath)}'`);
+  await table.delete(`\`filePath\` = '${escapeSqlString(filePath)}'`);
 }
 
 export async function deleteByFilePaths(table: Table, filePaths: string[]): Promise<void> {

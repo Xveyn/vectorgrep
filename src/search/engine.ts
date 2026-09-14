@@ -68,7 +68,7 @@ export class SearchEngine {
       }
     }
     if (filePattern) {
-      conditions.push(`"filePath" LIKE '${sanitizeFilePattern(filePattern)}'`);
+      conditions.push(`\`filePath\` LIKE '${sanitizeFilePattern(filePattern)}'`);
     }
     conditions.push(`id != '__placeholder__'`);
     const filter = conditions.join(" AND ");
@@ -174,7 +174,7 @@ export class SearchEngine {
         .filter((t): t is string => t !== null);
       if (safeTypes.length > 0) {
         const typeList = safeTypes.map((t) => `'${t}'`).join(", ");
-        typeConditions.push(`"symbolType" IN (${typeList})`);
+        typeConditions.push(`\`symbolType\` IN (${typeList})`);
       }
     }
 
@@ -203,7 +203,7 @@ export class SearchEngine {
 
       // Exact match on symbolName
       const exactConditions = [
-        `"symbolName" = '${safeQuery}'`,
+        `\`symbolName\` = '${safeQuery}'`,
         `id != '__placeholder__'`,
         ...typeConditions,
       ];
@@ -234,8 +234,8 @@ export class SearchEngine {
 
       // LIKE match on symbolName (contains query as substring)
       const likeConditions = [
-        `"symbolName" LIKE '%${safeQuery}%'`,
-        `"symbolName" != '${safeQuery}'`, // exclude already-found exact matches
+        `\`symbolName\` LIKE '%${safeQuery}%'`,
+        `\`symbolName\` != '${safeQuery}'`, // exclude already-found exact matches
         `id != '__placeholder__'`,
         ...typeConditions,
       ];
@@ -302,7 +302,7 @@ export class SearchEngine {
     // --- Phase 2: Vector search (always) ---
     // For identifier queries, also search chunks without symbolName (LineChunker fallback)
     const vectorConditions = [
-      ...(isIdent ? [] : [`"symbolName" != ''`]),
+      ...(isIdent ? [] : [`\`symbolName\` != ''`]),
       `id != '__placeholder__'`,
       ...typeConditions,
     ];

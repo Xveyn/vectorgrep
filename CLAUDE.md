@@ -20,7 +20,8 @@ claude mcp add vectordb-search -- node "D:/Programme (x86)/custom_claude_code_ve
 
 ## Wichtige Konventionen
 - ESM Module (.js Extensions in Imports)
-- LanceDB camelCase-Spalten muessen in Queries quoted werden: `"filePath"`, `"symbolName"`
+- LanceDB camelCase-Spalten muessen in Filtern mit Backticks escaped werden: `` `filePath` ``, `` `symbolName` `` — doppelte Anfuehrungszeichen (`"filePath"`) werden als String-Literal gelesen, der Filter matcht dann still nie
+- Aus LanceDB gelesene Vektoren sind Arrow-`Vector`s, keine Arrays — vor Weiterverwendung `Array.from()`
 - Placeholder-Records (`__placeholder__`) in leeren Tables filtern
 - Logging nur auf stderr (MCP nutzt stdout fuer Protocol)
 
