@@ -25,6 +25,12 @@ claude mcp add vectordb-search -- node "D:/Programme (x86)/custom_claude_code_ve
 - Placeholder-Records (`__placeholder__`) in leeren Tables filtern
 - Logging nur auf stderr (MCP nutzt stdout fuer Protocol)
 
+## Release-Prozess
+Details in `RELEASING.md`. Kurzfassung:
+- Releases erzeugt `.github/workflows/release.yml`, sobald ein PR mit Label `release:major`, `release:minor` oder `release:patch` nach `master` gemerged wird. Das Label steuert nur den Trigger, die Version kommt aus `package.json`
+- Im Release-PR (Branch `release/X.Y.Z`, Commit `chore(release): X.Y.Z`): `npm version X.Y.Z --no-git-tag-version` und CHANGELOG-Abschnitt `## X.Y.Z — YYYY-MM-DD` (Added/Changed/Fixed/Internal). Der Abschnitt ist Pflicht: er *ist* der Body des GitHub-Releases, `scripts/release-notes.mjs --check` bricht sonst ab
+- Der Workflow pusht nichts nach `master`. Er bricht ab, wenn Tag `vX.Y.Z` schon existiert, ueberspringt `npm publish` wenn die Version schon auf npm liegt, setzt dann den Tag und legt das Release an (Rollback von Release + Tag bei Fehler)
+
 ---
 
 # Verbesserungsplan

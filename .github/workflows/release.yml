@@ -1,19 +1,86 @@
 name: Release
 
+# Publishes a release when a PR labeled release:major, release:minor or
+# release:patch is merged into master (see RELEASING.md). The workflow never
+# pushes to master: the version bump and the CHANGELOG section belong in the
+# release PR.
 on:
-  release:
-    types: [published]
+  push:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
   contents: read
-  # npm trusted publishing (OIDC); also enables automatic provenance
-  id-token: write
 
 jobs:
-  publish:
-    name: Publish to npm
+  pre-check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      should_release: ${{ steps.gate.outputs.should_release }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Push events carry no PR labels, so the release:* gate looks up the PR
+      # that produced the pushed commit. A manual run is a deliberate trigger
+      # and bypasses the gate.
+      - name: Decide whether to release
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run → release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          labels=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+            --jq '.[].labels[].name' 2>/dev/null || true)
+          echo "Labels on the merged PR: ${labels:-<none>}"
+          if echo "$labels" | grep -qE '^release:(major|minor|patch)$'; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release:* label → skipping."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Read version
+        id: version
+        if: steps.gate.outputs.should_release == 'true'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing v${VERSION}"
+
+      # An existing tag means the version wasn't bumped in the release PR
+      - name: Verify tag does not exist yet
+        if: steps.gate.outputs.should_release == 'true'
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git fetch --tags --quiet
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} already exists. Bump the version in package.json in the release PR."
+            exit 1
+          fi
+
+      # The release body IS the CHANGELOG section; fail here, before anything is
+      # published or tagged, if it is missing.
+      - name: Verify changelog entry exists
+        if: steps.gate.outputs.should_release == 'true'
+        run: node scripts/release-notes.mjs --check
+
+  publish:
+    needs: pre-check
+    if: needs.pre-check.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the tag, create the GitHub release
+      id-token: write # npm trusted publishing (OIDC); also enables provenance
     env:
       # Skip onnxruntime-node's CUDA binary download from nuget.org; building, testing
       # and publishing only need the bundled CPU binaries, and the download times out.
@@ -42,5 +109,40 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Publish
-        run: npm publish
+      # Skipped when the version is already on npm: the very first release has to
+      # be published manually before trusted publishing can be configured, and a
+      # re-run after a failed tag/release step must not try to publish twice.
+      - name: Publish to npm
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION="${{ needs.pre-check.outputs.version }}"
+          if npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
+            echo "${NAME}@${VERSION} is already on npm — skipping publish."
+          else
+            # Build and tests ran in the steps above; don't repeat them via prepublishOnly
+            npm publish --ignore-scripts
+          fi
+
+      # Written before tagging: if extraction fails, there is no tag to roll back
+      - name: Create release notes
+        run: |
+          node scripts/release-notes.mjs --out release-notes.md
+          cat release-notes.md
+
+      # If creating the release fails after the tag was pushed, remove a partially
+      # created release first and then the tag, so a re-run passes the pre-check.
+      - name: Tag and create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.pre-check.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+          if ! gh release create "$TAG" --verify-tag --title "vectorgrep ${TAG}" --notes-file release-notes.md; then
+            echo "::error::gh release create failed — rolling back tag ${TAG}"
+            gh release delete "$TAG" --yes || true
+            git push origin ":refs/tags/${TAG}" || true
+            exit 1
+          fi

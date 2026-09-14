@@ -1,3 +1,4 @@
+import { createRequire } from "module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   InitInputSchema,
@@ -17,10 +18,13 @@ import { handleReindex } from "./tools/reindex.js";
 import { handleIndexUpdate } from "./tools/index-update.js";
 import { logger } from "./utils/logger.js";
 
+// package.json sits one level above both src/ and build/, and ships in the npm package
+const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
+
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "vectorgrep",
-    version: "0.1.0",
+    version,
   });
 
   server.tool(
