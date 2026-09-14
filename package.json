@@ -55,9 +55,9 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "^0.125.0",
     "@huggingface/transformers": "^4.2.0",
-    "@lancedb/lancedb": "^0.15.0",
+    "@lancedb/lancedb": "^0.38.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "apache-arrow": "^18.1.0",
     "chokidar": "^5.0.0",
@@ -65,7 +65,7 @@
     "minimatch": "^10.2.6",
     "simple-git": "^3.27.0",
     "tree-sitter-wasms": "^0.1.13",
-    "web-tree-sitter": "^0.24.7",
+    "web-tree-sitter": "^0.27.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
