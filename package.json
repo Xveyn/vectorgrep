@@ -1,6 +1,6 @@
 {
   "name": "vectorgrep",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP Server for vector-based semantic code search in Claude Code. Index your codebase locally with LanceDB and search code, files, and symbols using natural language.",
   "keywords": [
     "mcp",

@@ -16,7 +16,8 @@ Built with [LanceDB](https://lancedb.com/) (embedded vector database) and [Ollam
 - **Symbol Search** — find functions, classes, types by name or description
 - **Incremental Updates** — only re-index changed files
 - **Auto-Detection** — automatically uses Ollama if available, falls back to transformers.js
-- **Fast** — 1063 files indexed in 16s, searches under 50ms (with Ollama)
+- **Fast searches** — tens to a few hundred milliseconds once indexed (see [Performance](#performance))
+- **Agent-friendly** — tells Claude when to use semantic search instead of grep; safe for parallel subagents sharing one server
 - **Fully Local** — all data stored in `~/.vectordb/`, nothing leaves your machine
 
 ## Quick Start
@@ -84,7 +85,7 @@ building from source.
 | `init` | Index a project (scans files → chunks → embeddings → vector DB) |
 | `search_code` | Semantic code search with natural language |
 | `search_files` | Find relevant files by description |
-| `search_symbols` | Search functions, classes, types, interfaces |
+| `search_symbols` | Search functions, classes, methods, types, interfaces, enums and modules by name or description |
 | `index_status` | Show index statistics |
 | `index_update` | Incremental update (only changed files) |
 | `reindex` | Full rebuild of the index |
@@ -152,11 +153,15 @@ uses its own default: `nomic-embed-text` (Ollama), `Xenova/all-MiniLM-L6-v2`
 
 ## Performance
 
-| Codebase | Files | Chunks | Index Time (Ollama) | Search |
-|----------|-------|--------|---------------------|--------|
-| Small (50 files) | 49 | 107 | 1s | <10ms |
-| Medium (1k files) | 1,063 | 3,063 | 16s | <20ms |
-| Large (10k files) | ~10k | ~30k | ~5min | <50ms |
+Measured on a Windows desktop with Ollama (`nomic-embed-text`), calling the
+tools over MCP like Claude Code does, on a real Python/TypeScript project:
+
+| Files | Chunks | `init` (full index) | `index_update` (no changes) | Searches |
+|-------|--------|---------------------|-----------------------------|----------|
+| 2,716 | 31,489 | 177 s | ~1 s | 18–230 ms |
+
+Indexing time grows with the number of chunks and depends mostly on the
+embedding provider; transformers.js is slower than Ollama.
 
 ## Supported Languages
 

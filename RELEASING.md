@@ -36,7 +36,8 @@ stored in the repository, and npm attaches a provenance attestation.
    introduced and fixed between two releases — they never shipped. Omit empty
    categories.
 4. Commit as `chore(release): X.Y.Z`, open a PR and set the matching
-   `release:*` label.
+   `release:*` label. **Set the label before merging** — the workflow reads the
+   labels of the merged PR, so a label added afterwards doesn't trigger a release.
 5. Merge the PR (master is protected; solo: `gh pr merge <n> --squash --admin`).
 
 The workflow then runs two jobs:
@@ -81,6 +82,10 @@ the first version is published by hand **before** its release PR is merged:
 
 ## Recovery
 
+- **Release PR merged without a `release:*` label**: the `pre-check` job skipped
+  the release. Start the workflow manually on `master` (Actions → **Release** →
+  *Run workflow*, or `gh workflow run release.yml --ref master`); it releases the
+  version in `package.json`.
 - **Release creation failed** (network, rate limit): the job already removed the
   tag and the partial release. Re-run the workflow — publishing is skipped if
   the version reached npm.

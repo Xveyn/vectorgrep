@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.3.0 — 2026-09-14
+
+vectorgrep now holds up when several agents use it at the same time, and tells
+agents itself when and how to use it.
+
+### Added
+- **Usage instructions for agents**: the server sends instructions, and every
+  tool description says when to use it — semantic search for questions about
+  what code does, grep for exact text, `init` once per project, `index_update`
+  for routine refreshes. These reach every agent, including Explore and Plan
+  subagents, which don't receive a project's CLAUDE.md (#53).
+- `search_symbols` can filter by `enum` and `module` (#41).
+
+### Changed
+- Searching a project that was never indexed now answers "No index found …
+  Run 'init'" instead of an empty result, and no longer creates empty tables
+  (#52).
+- Requests to Ollama and OpenAI time out after 60 seconds (Ollama's
+  availability check after 5 seconds) and are retried, instead of waiting
+  forever for a server that doesn't answer (#33).
+
+### Fixed
+- **Parallel tool calls**, e.g. from subagents sharing one server: concurrent
+  `index_update` calls added the same new files twice or failed with LanceDB
+  commit conflicts, and a search started during `init` or `reindex` kept
+  returning nothing afterwards. Index writes for a project now run one after
+  another, and searches wait for them (#52).
+- `index_update` indexed every file a second time when it couldn't read the
+  existing file hashes (#32).
+- `index_status` showed wrong file, chunk and symbol counts after
+  `index_update` (#37).
+- Projects using different transformers.js models in the same server process
+  overwrote each other's model (#30).
+
+### Internal
+- Test coverage is measured in CI and may not drop below a floor (currently
+  84 % statements, 71 % branches, 90 % functions, 85 % lines). New tests cover
+  input sanitizing, retries, the embedding cache, result formatting and all
+  tool handlers (#54, #55).
+- The README installs from npm instead of cloning (#51); CLAUDE.md now holds
+  project guidance only, open work is tracked in GitHub issues (#67).
+
+### Upgrade notes
+- No reindex required — the index format is unchanged since 0.2.0.
+- Wrong counts in `index_status` from earlier versions are corrected the next
+  time `index_update` finds changes, or right away with `reindex`.
+
 ## 0.2.0 — 2026-09-14
 
 The first public release on npm, under the new name `vectorgrep` — plus a long

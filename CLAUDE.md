@@ -28,7 +28,7 @@ npm run test:coverage                        # mit Coverage, wie in der CI auf N
 - **Entry:** `src/index.ts` (stdio) -> `src/server.ts` (7 Tools, Server-Instructions)
 - **Tools** (`src/tools/`): schreibend `init`, `reindex`, `index_update`; lesend `search_code`, `search_files`, `search_symbols`, `index_status`
 - **Indexierung:** `file-scanner` (git ls-files bzw. glob, include/exclude über minimatch) -> `ASTChunker` (Tree-sitter, nicht abgedeckte Zeilen werden zeilenweise gechunkt; Fallback `LineChunker`) -> `pipeline` (Embeddings, Wiederverwendung unveränderter Chunk-Vektoren) -> `indexer` (Voll- und inkrementelle Indexierung)
-- **Embedding:** Ollama -> transformers.js-Fallback, OpenAI optional; immer umhüllt vom `CachedEmbeddingProvider` (LRU)
+- **Embedding:** Ollama -> transformers.js-Fallback, OpenAI optional; immer umhüllt vom `CachedEmbeddingProvider` (LRU). HTTP-Provider mit Timeout (60 s) und Retry (`HttpProviderOptions`, `src/utils/retry.ts`)
 - **DB:** LanceDB embedded unter `~/.vectordb/projects/<sha256-hash>/` (`lancedb/` + `metadata.json`), Tabellen `chunks` und `files`
 - **Suche:** Hybrid aus Vektor und BM25, Gewichtung nach Query-Typ (Identifier vs. Beschreibung)
 - **Kontext:** `src/context.ts` cached Embedder, DB und Engine pro Projekt
@@ -38,6 +38,7 @@ npm run test:coverage                        # mit Coverage, wie in der CI auf N
 - ESM-Module (`.js`-Endungen in relativen Imports). Logging nur auf stderr — stdout ist das MCP-Protokoll
 - **LanceDB-Filter:** camelCase-Spalten mit Backticks escapen (`` `filePath` ``, `` `symbolName` ``). Doppelte Anführungszeichen (`"filePath"`) sind String-Literale, der Filter matcht dann still nie. Nutzereingaben immer durch `src/utils/sanitize.ts`
 - Aus LanceDB gelesene Vektoren sind Arrow-`Vector`s, keine Arrays — vor Weiterverwendung `Array.from()`
+- LanceDB-Abfragen liefern ohne `limit` nur **10 Zeilen** — `table.query()` genauso wie die Vektorsuche. Alle Zeilen lesen: `queryAllRows` in `src/db/operations.ts` (Limit = Anzahl der Treffer)
 - Placeholder-Records (`__placeholder__`) in leeren Tabellen beim Lesen filtern
 - `fullIndex` schreibt mit `overwriteChunksTable` / `overwriteFilesTable`, nie über `getOrCreate…Table(data)`: die ignorieren die Daten, wenn die Tabelle bereits existiert
 - **Nebenläufigkeit:** Parallele Subagents teilen sich einen Serverprozess. Schreibende Tools laufen unter `withProjectWriteLock`, Suchen warten mit `waitForProjectWrites`, Schreibvorgänge verwerfen danach den Projekt-Kontext. Das gilt nur innerhalb eines Prozesses — mehrere Server-Prozesse sind nicht koordiniert (#46)
