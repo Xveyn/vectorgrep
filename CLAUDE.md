@@ -1,133 +1,93 @@
-# vectorgrep - MCP Server (Codebase Semantic Search)
+# CLAUDE.md
 
-## Build & Test
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+# vectorgrep – Projekthinweise
+
+MCP-Server für semantische Codesuche in Claude Code. Indexiert ein Projekt lokal (Tree-sitter-Chunks, Embeddings über Ollama oder transformers.js, LanceDB) und stellt Such- und Index-Tools über stdio bereit. Veröffentlicht auf npm als `vectorgrep`.
+
+**Offene Arbeit steht in den GitHub-Issues, nicht in dieser Datei.** Taucht bei einer Aufgabe ein Nebenbefund auf (Bug, Altlast, sinnvolle Folgearbeit), der nicht zum Task gehört: nicht still mitfixen, sondern benennen (Problem, Fundort, warum out of scope) und fragen, ob ein Issue angelegt werden soll.
+
+## Entwicklung
+
 ```bash
-npm run build          # TypeScript kompilieren
-npx vitest run         # Alle Tests ausfuehren
-npm run test:coverage  # Tests mit Coverage (so laeuft es in der CI auf Node 22)
+npm install
+npm run build                                # TypeScript -> build/
+npm test                                     # alle Tests (vitest)
+npx vitest run test/unit/sanitize.test.ts    # eine Datei
+npx vitest run -t "search_symbols"           # Tests nach Namen
+npm run test:coverage                        # mit Coverage, wie in der CI auf Node 22
 ```
 
-### Coverage-Floor
-- Die CI bricht ab, wenn die Coverage unter die `thresholds` in `vitest.config.ts` faellt (Statements, Branches, Functions, Lines)
-- **Nach neuen Tests den Floor anheben**: `npm run test:coverage` laufen lassen und die vier Werte auf die gemessenen Prozent **abgerundet** setzen (z.B. 82.92 % -> 82). Im selben PR wie die Tests
-- Den Floor **nie senken**, um einen PR gruen zu bekommen — fehlende Tests nachziehen
-
-## MCP Registration
-```bash
-claude mcp add vectordb-search -- node "D:/Programme (x86)/custom_claude_code_vector_database/build/index.js"
-```
+- Node.js >= 20. Die Tests laufen offline (Mock-Embedder), Ollama ist nicht nötig
+- Lokal registrieren: `claude mcp add vectordb-search -- node "D:/Programme (x86)/custom_claude_code_vector_database/build/index.js"`. Der Name `vectordb-search` bleibt, weil andere Projekte (z.B. Baluhost) die Tools als `mcp__vectordb-search__*` aufrufen
+- Nach `npm run build` Claude Code neu starten: ein laufender Server behält den Code, mit dem er gestartet wurde
 
 ## Architektur
-- Entry: `src/index.ts` -> `src/server.ts` (7 MCP Tools)
-- Embedding: Ollama -> transformers.js Fallback, OpenAI optional
-- Chunking: Tree-sitter AST -> Line-based Fallback
-- DB: LanceDB embedded, Speicherort `~/.vectordb/projects/<hash>/`
-- Search: Hybrid (Vector + BM25), gewichtet nach Query-Typ
+
+- **Entry:** `src/index.ts` (stdio) -> `src/server.ts` (7 Tools, Server-Instructions)
+- **Tools** (`src/tools/`): schreibend `init`, `reindex`, `index_update`; lesend `search_code`, `search_files`, `search_symbols`, `index_status`
+- **Indexierung:** `file-scanner` (git ls-files bzw. glob, include/exclude über minimatch) -> `ASTChunker` (Tree-sitter, nicht abgedeckte Zeilen werden zeilenweise gechunkt; Fallback `LineChunker`) -> `pipeline` (Embeddings, Wiederverwendung unveränderter Chunk-Vektoren) -> `indexer` (Voll- und inkrementelle Indexierung)
+- **Embedding:** Ollama -> transformers.js-Fallback, OpenAI optional; immer umhüllt vom `CachedEmbeddingProvider` (LRU)
+- **DB:** LanceDB embedded unter `~/.vectordb/projects/<sha256-hash>/` (`lancedb/` + `metadata.json`), Tabellen `chunks` und `files`
+- **Suche:** Hybrid aus Vektor und BM25, Gewichtung nach Query-Typ (Identifier vs. Beschreibung)
+- **Kontext:** `src/context.ts` cached Embedder, DB und Engine pro Projekt
 
 ## Wichtige Konventionen
-- ESM Module (.js Extensions in Imports)
-- LanceDB camelCase-Spalten muessen in Filtern mit Backticks escaped werden: `` `filePath` ``, `` `symbolName` `` — doppelte Anfuehrungszeichen (`"filePath"`) werden als String-Literal gelesen, der Filter matcht dann still nie
+
+- ESM-Module (`.js`-Endungen in relativen Imports). Logging nur auf stderr — stdout ist das MCP-Protokoll
+- **LanceDB-Filter:** camelCase-Spalten mit Backticks escapen (`` `filePath` ``, `` `symbolName` ``). Doppelte Anführungszeichen (`"filePath"`) sind String-Literale, der Filter matcht dann still nie. Nutzereingaben immer durch `src/utils/sanitize.ts`
 - Aus LanceDB gelesene Vektoren sind Arrow-`Vector`s, keine Arrays — vor Weiterverwendung `Array.from()`
-- Placeholder-Records (`__placeholder__`) in leeren Tables filtern
-- Logging nur auf stderr (MCP nutzt stdout fuer Protocol)
+- Placeholder-Records (`__placeholder__`) in leeren Tabellen beim Lesen filtern
+- `fullIndex` schreibt mit `overwriteChunksTable` / `overwriteFilesTable`, nie über `getOrCreate…Table(data)`: die ignorieren die Daten, wenn die Tabelle bereits existiert
+- **Nebenläufigkeit:** Parallele Subagents teilen sich einen Serverprozess. Schreibende Tools laufen unter `withProjectWriteLock`, Suchen warten mit `waitForProjectWrites`, Schreibvorgänge verwerfen danach den Projekt-Kontext. Das gilt nur innerhalb eines Prozesses — mehrere Server-Prozesse sind nicht koordiniert (#46)
+- **Server-Instructions und Tool-Beschreibungen sind die Nutzungsregeln für Agents** — Explore- und Plan-Subagents bekommen keine CLAUDE.md. Ändert sich das Verhalten eines Tools, Beschreibung mitziehen (`test/unit/server.test.ts`)
+
+## Tests / CI
+
+- CI (`.github/workflows/ci.yml`): Build und Tests auf Node 20 und 22, Node 22 mit Coverage. `ONNXRUNTIME_NODE_INSTALL=skip`, sonst lädt `npm ci` CUDA-Binaries von nuget.org und bricht regelmäßig mit Timeout ab
+- Tool-Handler-Tests mocken `src/embedding/factory.js` mit `test/helpers/mock-embedding.ts`. DB-Tests laufen gegen echtes LanceDB, Scanner-Tests gegen ein echtes `git init`
+- Integrationstests schreiben derzeit ins echte `~/.vectordb/` und räumen danach auf (#59)
+- Bugfix: zuerst ein Test, der den Bug rot zeigt, dann der Fix
+
+### Coverage-Floor
+
+- Die CI bricht ab, wenn die Coverage unter die `thresholds` in `vitest.config.ts` fällt (Statements, Branches, Functions, Lines)
+- **Nach neuen Tests den Floor anheben:** `npm run test:coverage` laufen lassen und die vier Werte auf die gemessenen Prozent **abgerundet** setzen (z.B. 82,92 % -> 82), im selben PR wie die Tests
+- Den Floor **nie senken**, um einen PR grün zu bekommen — fehlende Tests nachziehen
+
+### Abhängigkeiten
+
+- Nach Änderungen an Abhängigkeiten unter Windows die Lockfile prüfen: ein inkrementelles `npm install` kann plattformspezifische optionale Pakete entfernen, dann scheitert `npm ci` in der Linux-CI. Kontrolle: `grep -c '"node_modules/@emnapi' package-lock.json` muss > 0 sein, sonst `node_modules` und `package-lock.json` löschen und neu installieren
+- `apache-arrow` ist Peer-Dependency von `@lancedb/lancedb` (`<= 18.1.0`) — nur zusammen mit LanceDB anheben
 
 ## Release-Prozess
+
 Details in `RELEASING.md`. Kurzfassung:
-- Releases erzeugt `.github/workflows/release.yml`, sobald ein PR mit Label `release:major`, `release:minor` oder `release:patch` nach `master` gemerged wird. Das Label steuert nur den Trigger, die Version kommt aus `package.json`
+
+- Releases erzeugt `.github/workflows/release.yml`, sobald ein PR mit Label `release:major`, `release:minor` oder `release:patch` nach `master` gemerged wird. Das Label steuert nur den Trigger, die Version kommt aus `package.json`. **Das Label muss vor dem Merge gesetzt sein**, sonst wird das Release übersprungen (nachholen: Workflow manuell starten)
 - Im Release-PR (Branch `release/X.Y.Z`, Commit `chore(release): X.Y.Z`): `npm version X.Y.Z --no-git-tag-version` und CHANGELOG-Abschnitt `## X.Y.Z — YYYY-MM-DD` (Added/Changed/Fixed/Internal). Der Abschnitt ist Pflicht: er *ist* der Body des GitHub-Releases, `scripts/release-notes.mjs --check` bricht sonst ab
-- Der Workflow pusht nichts nach `master`. Er bricht ab, wenn Tag `vX.Y.Z` schon existiert, ueberspringt `npm publish` wenn die Version schon auf npm liegt, setzt dann den Tag und legt das Release an (Rollback von Release + Tag bei Fehler)
+- Der Workflow pusht nichts nach `master`. Er bricht ab, wenn Tag `vX.Y.Z` schon existiert, überspringt `npm publish`, wenn die Version schon auf npm liegt, setzt dann den Tag und legt das Release an (Rollback von Release und Tag bei Fehler). Veröffentlicht wird per npm Trusted Publishing mit Provenance
 
----
+## Branch Protection
 
-# Verbesserungsplan
+- `master` ist doppelt geschützt — klassische Branch Protection **und** ein Ruleset. Branch Protection: PR-Pflicht mit 1 Review, Required Checks `Build & Test (Node 20.x)` und `Build & Test (Node 22.x)`, Branch muss aktuell sein, lineare Historie. Ruleset: kein Löschen, kein Force-Push, PR-Pflicht
+- Admins sind ausgenommen. Als Solo-Maintainer mergen: `gh pr merge <n> --squash --admin`
+- Die Namen der CI-Jobs sind Required Checks: Matrix oder Job-Namen in `ci.yml` nicht ändern, ohne die Required Checks anzupassen — ein nie gemeldeter Required Check blockiert jeden PR
 
-## Status-Legende
-- [ ] Offen
-- [x] Erledigt
+## Struktur
 
-## Bereits umgesetzt
-- [x] Server-Level Singleton mit Init-Lock (Race Condition Fix)
-- [x] LRU Embedding Cache (500 Entries)
-- [x] Tree-sitter WASM Loading Fix (tree-sitter-wasms Package)
-- [x] Hybrid Search (BM25 + Vector Fusion)
-- [x] Score Threshold Filtering (MIN_SCORE_THRESHOLD = 0.05)
-- [x] Chunk-Level Hashing fuer inkrementelle Updates (Vector-Reuse)
-
----
-
-## KRITISCH - Sicherheit
-
-### 1. SQL Injection in Search/Delete
-- [x] `filePattern` in `engine.ts` — jetzt via `sanitizeFilePattern()`
-- [x] `language` in `engine.ts` — jetzt via `sanitizeLanguage()` (Whitelist)
-- [x] `symbolTypes` in `engine.ts` — jetzt via `sanitizeSymbolType()` (Whitelist)
-- [x] `filePath` in `operations.ts` + `indexer.ts` — jetzt via `escapeSqlString()`
-- **Zentrale Sanitize-Funktionen in `src/utils/sanitize.ts`**
-
----
-
-## HOCH - Qualitaet & Robustheit
-
-### 2. Retry-Logik fuer Embedding-APIs
-- [x] `ollama.ts` — `embed()` und `embedBatch()` mit `withRetry()` gewrappt
-- [x] `openai.ts` — `embed()` und `embedBatch()` mit `withRetry()` gewrappt
-- **Zentrale Retry-Utility in `src/utils/retry.ts`** (3 Retries, Exponential Backoff 1s/2s/4s, max 8s)
-- **Retries nur bei transienten Fehlern** (Netzwerk, 429, 5xx) — 4xx Client-Errors werden sofort geworfen
-
-### 3. Transformers.js Batch-Embedding
-- [x] `transformers.ts` — Native Batch-Verarbeitung statt Einzel-Calls
-- **Mini-Batches a 32 Texte** um OOM zu vermeiden, Tensor-Slicing fuer Ergebnis-Extraktion
-
-### 4. Fortschritts-Streaming bei Indexierung
-- [ ] Bei 1000+ Dateien minutenlanges Warten ohne Feedback
-- **Fix:** MCP Progress Notifications nutzen (SDK unterstuetzt das)
-
-### 5. Index-Versionierung
-- [ ] Schema-Aenderungen brechen alte Indices ohne Warnung
-- **Fix:** Version in Metadata speichern (bereits `version: "0.1.0"`), beim Laden pruefen, Auto-Reindex bei Mismatch
-
----
-
-## MITTEL - Features
-
-### 6. Such-Ergebnis-Caching
-- [ ] Identische Queries werden jedes Mal neu embedded + gesucht
-- **Fix:** LRU Cache mit 30s TTL fuer komplette Search-Results
-
-### 7. Konfigurierbarer Speicherort
-- [ ] `~/.vectordb/` ist hardcoded in `paths.ts:6`
-- **Fix:** `VECTORDB_PATH` Environment-Variable, Fallback auf `~/.vectordb/`
-
-### 8. Environment Variables fuer API Keys
-- [ ] OpenAI Key muss in `.vectordb.json` stehen
-- **Fix:** `OPENAI_API_KEY` env var in `openai.ts` unterstuetzen
-
-### 9. Fehler-Zusammenfassung nach Indexierung
-- [ ] Fehlgeschlagene Dateien werden still uebersprungen
-- **Fix:** Fehler sammeln, am Ende Summary ausgeben ("3 Dateien uebersprungen: ...")
-
-### 10. Kontext-Laenge-Begrenzung
-- [ ] Sehr lange Funktionen (500+ Zeilen) werden komplett zurueckgegeben
-- **Fix:** Max-Content-Length in Search-Results, truncation mit `...` Marker
-
----
-
-## NIEDRIG - Nice-to-have
-
-### 11. Search Highlighting
-- [ ] Matching-Terme im Code hervorheben (Markdown Bold/Backticks)
-
-### 12. Score-Breakdown
-- [ ] Vector-Score vs BM25-Score pro Ergebnis anzeigen (Debug-Modus)
-
-### 13. Index-Integritaets-Check
-- [ ] Korrupte LanceDB-Daten erkennen und User warnen
-- **Fix:** Checksum ueber Metadata + Table Row Counts
-
-### 14. CLI-Interface
-- [ ] Index inspizieren/reparieren ohne Claude Code
-- **Fix:** `npx vectorgrep status <path>`, `npx vectorgrep reindex <path>`
-
-### 15. Metriken/Observability
-- [ ] Latenz, Cache-Hit-Raten, Embedding-Kosten tracken
-- **Fix:** Optional metrics in Metadata speichern, per `index_status` abrufbar
+```
+src/
+├── index.ts, server.ts, context.ts
+├── config/      schema.ts (zod, Defaults), loader.ts (.vectordb.json)
+├── db/          connection.ts (VectorDB), operations.ts, schema.ts
+├── embedding/   provider.ts, factory.ts, cache.ts, ollama.ts, transformers.ts, openai.ts
+├── chunking/    chunker.ts, ast-chunker.ts, line-chunker.ts, languages.ts
+├── indexing/    indexer.ts, pipeline.ts, file-scanner.ts, change-detector.ts
+├── search/      engine.ts, bm25.ts, formatter.ts
+├── tools/       schemas.ts + ein Handler pro Tool
+└── utils/       paths, sanitize, retry, project-lock, git, hash, concurrency, logger
+scripts/release-notes.mjs    CHANGELOG-Abschnitt -> Release-Body
+test/unit, test/integration, test/helpers, test/fixtures
+```
