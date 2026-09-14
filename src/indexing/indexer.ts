@@ -1,6 +1,6 @@
 import type { Table } from "@lancedb/lancedb";
 import { VectorDB } from "../db/connection.js";
-import { addChunks, addFiles, deleteByFilePaths, countRows, searchChunks } from "../db/operations.js";
+import { addChunks, addFiles, deleteByFilePaths, countRows, queryAllRows } from "../db/operations.js";
 import type { ChunkRecord, FileRecord, ProjectMetadata } from "../db/schema.js";
 import type { EmbeddingProvider } from "../embedding/provider.js";
 import type { Chunker } from "../chunking/chunker.js";
@@ -199,13 +199,14 @@ export class Indexer {
       await addFiles(filesTable, allFiles);
     }
 
-    // Update metadata
+    // Update metadata. Recount from the tables: adjusting the old totals drifts when a
+    // file fails to process, and a table that started empty still holds its placeholder row.
     const metadata = await this.db.loadMetadata();
     if (metadata) {
       metadata.lastIndexedAt = new Date().toISOString();
-      metadata.totalFiles += changes.filter((c) => c.status === "added").length;
-      metadata.totalFiles -= changes.filter((c) => c.status === "deleted").length;
-      metadata.totalChunks = await countRows(chunksTable);
+      metadata.totalFiles = await countRows(filesTable, "`filePath` != '__placeholder__'");
+      metadata.totalChunks = await countRows(chunksTable, "id != '__placeholder__'");
+      metadata.totalSymbols = await countRows(chunksTable, "`symbolName` != '' AND id != '__placeholder__'");
       await this.db.saveMetadata(metadata);
     }
 
@@ -225,52 +226,37 @@ export class Indexer {
   ): Promise<Map<string, Map<string, { summaryHash: string; vector: number[] }>>> {
     const result = new Map<string, Map<string, { summaryHash: string; vector: number[] }>>();
 
-    try {
-      for (const filePath of modifiedFiles) {
-        const rows = await chunksTable
-          .search(new Array(this.embedder.dimensions).fill(0))
-          .where(`\`filePath\` = '${escapeSqlString(filePath)}' AND id != '__placeholder__'`)
-          .limit(10000)
-          .toArray();
+    for (const filePath of modifiedFiles) {
+      const rows = await queryAllRows(
+        chunksTable,
+        `\`filePath\` = '${escapeSqlString(filePath)}' AND id != '__placeholder__'`,
+        ["id", "summary", "vector"]
+      );
 
-        if (rows.length > 0) {
-          const chunkMap = new Map<string, { summaryHash: string; vector: number[] }>();
-          for (const row of rows) {
-            chunkMap.set(row.id, {
-              summaryHash: hashString(row.summary || ""),
-              // LanceDB returns an Arrow Vector, which doesn't support index access
-              vector: Array.from(row.vector as Iterable<number>),
-            });
-          }
-          result.set(filePath, chunkMap);
-          logger.debug(`Loaded ${chunkMap.size} existing chunks for ${filePath}`);
+      if (rows.length > 0) {
+        const chunkMap = new Map<string, { summaryHash: string; vector: number[] }>();
+        for (const row of rows) {
+          chunkMap.set(row.id as string, {
+            summaryHash: hashString((row.summary as string) || ""),
+            // LanceDB returns an Arrow Vector, which doesn't support index access
+            vector: Array.from(row.vector as Iterable<number>),
+          });
         }
+        result.set(filePath, chunkMap);
+        logger.debug(`Loaded ${chunkMap.size} existing chunks for ${filePath}`);
       }
-    } catch (error) {
-      logger.debug("Could not load existing chunk data", { error: String(error) });
     }
 
     return result;
   }
 
+  /**
+   * Hashes of all indexed files. Errors propagate on purpose: with an empty map every
+   * file would count as added and be indexed a second time.
+   */
   private async getExistingFileHashes(): Promise<Map<string, string>> {
-    const hashes = new Map<string, string>();
-
-    try {
-      const filesTable = await this.db.getOrCreateFilesTable();
-      const allFiles = await filesTable.search(new Array(this.embedder.dimensions).fill(0))
-        .limit(100000)
-        .toArray();
-
-      for (const row of allFiles) {
-        if (row.filePath && row.filePath !== "__placeholder__") {
-          hashes.set(row.filePath, row.fileHash);
-        }
-      }
-    } catch {
-      logger.debug("Could not load existing file hashes");
-    }
-
-    return hashes;
+    const filesTable = await this.db.getOrCreateFilesTable();
+    const rows = await queryAllRows(filesTable, "`filePath` != '__placeholder__'", ["filePath", "fileHash"]);
+    return new Map(rows.map((row) => [row.filePath as string, row.fileHash as string]));
   }
 }

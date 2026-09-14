@@ -108,6 +108,22 @@ export async function deleteByFilePaths(table: Table, filePaths: string[]): Prom
   }
 }
 
-export async function countRows(table: Table): Promise<number> {
-  return await table.countRows();
+export async function countRows(table: Table, filter?: string): Promise<number> {
+  return await table.countRows(filter);
+}
+
+/**
+ * Read every row matching `filter`. LanceDB queries return only 10 rows unless a
+ * limit is set, so the limit is the number of matching rows.
+ */
+export async function queryAllRows(
+  table: Table,
+  filter: string,
+  columns?: string[]
+): Promise<Record<string, unknown>[]> {
+  const count = await table.countRows(filter);
+  if (count === 0) return [];
+  let query = table.query().where(filter).limit(count);
+  if (columns) query = query.select(columns);
+  return (await query.toArray()) as Record<string, unknown>[];
 }

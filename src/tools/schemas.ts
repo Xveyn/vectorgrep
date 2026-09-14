@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SEARCHABLE_SYMBOL_TYPES } from "../chunking/chunker.js";
 
 export const InitInputSchema = z.object({
   projectPath: z.string().describe("Absolute path to the project root directory"),
@@ -45,7 +46,7 @@ export const SearchSymbolsInputSchema = z.object({
     .describe("Symbol name, exact or partial (e.g. \"TapoService\"), or a description of the symbol"),
   projectPath: z.string().describe("Absolute path to the project root directory"),
   symbolTypes: z
-    .array(z.enum(["function", "class", "method", "interface", "type", "variable", "import"]))
+    .array(z.enum(SEARCHABLE_SYMBOL_TYPES))
     .optional()
     .describe("Filter by symbol type"),
   limit: z.number().min(1).max(50).optional().describe("Maximum number of results (default: 10)"),

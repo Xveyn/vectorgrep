@@ -37,6 +37,18 @@ describe("withRetry", () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  it("retries a request that was aborted by its timeout", async () => {
+    // What fetch rejects with when AbortSignal.timeout() fires
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    const fn = vi.fn().mockRejectedValueOnce(timeout).mockResolvedValueOnce("recovered");
+
+    const result = withRetry(fn, "test", { baseDelayMs: 10 });
+    await vi.runAllTimersAsync();
+
+    await expect(result).resolves.toBe("recovered");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
   it.each(["Ollama embed failed: 400 Bad Request", "OpenAI embed failed: 401 Unauthorized", "invalid input"])(
     "does not retry the client error %j",
     async (message) => {

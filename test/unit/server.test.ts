@@ -58,4 +58,19 @@ describe("MCP server metadata", () => {
     expect(description("reindex")).toMatch(/index_update/);
     expect(description("init")).toMatch(/index_update/);
   });
+
+  it("accepts every symbol type the chunker emits in search_symbols", async () => {
+    const result = await client.callTool({
+      name: "search_symbols",
+      arguments: {
+        projectPath: "/nonexistent/vectorgrep-server-test",
+        query: "FanMode",
+        symbolTypes: ["enum", "module"],
+      },
+    });
+    const text = (result.content as Array<{ text?: string }>).map((c) => c.text ?? "").join("\n");
+
+    expect(result.isError).toBeFalsy();
+    expect(text).toContain("No index found");
+  });
 });
