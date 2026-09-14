@@ -70,6 +70,10 @@
   "devDependencies": {
     "@types/node": "^22.13.10",
     "typescript": "^5.8.2",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "sharp": "^0.35.4",
+    "adm-zip": "^0.6.1"
   }
 }
