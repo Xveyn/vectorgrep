@@ -18,6 +18,7 @@ export async function handleSearchFiles(input: SearchFilesInput): Promise<string
   } catch (error) {
     if (error instanceof NoIndexError) return error.message;
     logger.error("search_files failed", { error: String(error) });
-    return `Error searching files: ${error}`;
+    // Thrown, not returned: the MCP SDK turns it into a result with isError: true
+    throw new Error(`Error searching files: ${error}`);
   }
 }

@@ -80,9 +80,9 @@ describe("Integration: concurrent tool calls on one server", () => {
     await handleInit({ projectPath });
     await writeModules(projectPath, 0, 10, 1);
 
-    const results = await Promise.all([handleIndexUpdate({ projectPath }), handleIndexUpdate({ projectPath })]);
+    // A failing call throws, which rejects Promise.all and fails the test
+    await Promise.all([handleIndexUpdate({ projectPath }), handleIndexUpdate({ projectPath })]);
 
-    expect(results.filter((r) => r.startsWith("Error"))).toEqual([]);
     expect(await tableRows(projectPath, "files")).toHaveLength(40);
   });
 

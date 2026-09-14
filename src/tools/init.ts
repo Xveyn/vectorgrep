@@ -54,7 +54,8 @@ async function initIndex(input: InitInput, projectPath: string): Promise<string>
     ].join("\n");
   } catch (error) {
     logger.error("Init failed", { error: String(error) });
-    return `Error initializing index: ${error}`;
+    // Thrown, not returned: the MCP SDK turns it into a result with isError: true
+    throw new Error(`Error initializing index: ${error}`);
   } finally {
     // A search that started just before the write may have cached tables from before it
     await invalidateProjectContext(projectPath);

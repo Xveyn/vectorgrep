@@ -46,7 +46,8 @@ async function reindex(projectPath: string): Promise<string> {
     ].join("\n");
   } catch (error) {
     logger.error("reindex failed", { error: String(error) });
-    return `Error during reindex: ${error}`;
+    // Thrown, not returned: the MCP SDK turns it into a result with isError: true
+    throw new Error(`Error during reindex: ${error}`);
   } finally {
     // A search that started just before the write may have cached tables from before it
     await invalidateProjectContext(projectPath);

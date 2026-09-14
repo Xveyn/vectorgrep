@@ -45,6 +45,7 @@ export async function handleIndexStatus(input: IndexStatusInput): Promise<string
     ].join("\n");
   } catch (error) {
     logger.error("index_status failed", { error: String(error) });
-    return `Error getting index status: ${error}`;
+    // Thrown, not returned: the MCP SDK turns it into a result with isError: true
+    throw new Error(`Error getting index status: ${error}`);
   }
 }
