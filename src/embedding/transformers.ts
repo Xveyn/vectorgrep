@@ -8,7 +8,7 @@ let extractor: any = null;
 export class TransformersEmbeddingProvider implements EmbeddingProvider {
   readonly name = "transformers";
   private _dimensions = 0;
-  private model: string;
+  readonly model: string;
 
   constructor(model = "Xenova/all-MiniLM-L6-v2") {
     this.model = model;

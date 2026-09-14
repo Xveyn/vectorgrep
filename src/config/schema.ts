@@ -2,7 +2,9 @@ import { z } from "zod";
 
 export const EmbeddingConfigSchema = z.object({
   provider: z.enum(["auto", "ollama", "transformers", "openai"]).default("auto"),
-  model: z.string().default("nomic-embed-text"),
+  // No shared default: each provider falls back to its own model (nomic-embed-text for
+  // Ollama, all-MiniLM-L6-v2 for transformers.js, text-embedding-3-small for OpenAI).
+  model: z.string().optional(),
   batchSize: z.number().min(1).max(1000).default(100),
   dimensions: z.number().optional(),
   ollamaUrl: z.string().default("http://localhost:11434"),

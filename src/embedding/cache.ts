@@ -27,6 +27,10 @@ export class CachedEmbeddingProvider implements EmbeddingProvider {
     return this.inner.name;
   }
 
+  get model(): string {
+    return this.inner.model;
+  }
+
   get dimensions(): number {
     return this.inner.dimensions;
   }

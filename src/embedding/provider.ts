@@ -1,5 +1,7 @@
 export interface EmbeddingProvider {
   readonly name: string;
+  /** Model actually in use (the provider's default when none was configured) */
+  readonly model: string;
   readonly dimensions: number;
 
   /** Initialize the provider (load model, check availability) */
