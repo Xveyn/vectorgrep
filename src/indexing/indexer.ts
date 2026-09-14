@@ -1,3 +1,4 @@
+import type { Table } from "@lancedb/lancedb";
 import { VectorDB } from "../db/connection.js";
 import { addChunks, addFiles, deleteByFilePaths, countRows, searchChunks } from "../db/operations.js";
 import type { ChunkRecord, FileRecord, ProjectMetadata } from "../db/schema.js";
@@ -227,7 +228,7 @@ export class Indexer {
   }
 
   private async getExistingChunkData(
-    chunksTable: any,
+    chunksTable: Table,
     modifiedFiles: Set<string>
   ): Promise<Map<string, Map<string, { summaryHash: string; vector: number[] }>>> {
     const result = new Map<string, Map<string, { summaryHash: string; vector: number[] }>>();
@@ -236,7 +237,7 @@ export class Indexer {
       for (const filePath of modifiedFiles) {
         const rows = await chunksTable
           .search(new Array(this.embedder.dimensions).fill(0))
-          .where(`"filePath" = '${escapeSqlString(filePath)}' AND id != '__placeholder__'`)
+          .where(`\`filePath\` = '${escapeSqlString(filePath)}' AND id != '__placeholder__'`)
           .limit(10000)
           .toArray();
 
@@ -245,7 +246,8 @@ export class Indexer {
           for (const row of rows) {
             chunkMap.set(row.id, {
               summaryHash: hashString(row.summary || ""),
-              vector: row.vector,
+              // LanceDB returns an Arrow Vector, which doesn't support index access
+              vector: Array.from(row.vector as Iterable<number>),
             });
           }
           result.set(filePath, chunkMap);
