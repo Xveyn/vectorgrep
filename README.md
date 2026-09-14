@@ -1,8 +1,9 @@
-# codebase-semantic-search
+# vectorgrep
 
-[![CI](https://github.com/Xveyn/codebase-semantic-search/actions/workflows/ci.yml/badge.svg)](https://github.com/Xveyn/codebase-semantic-search/actions/workflows/ci.yml)
+[![CI](https://github.com/Xveyn/vectorgrep/actions/workflows/ci.yml/badge.svg)](https://github.com/Xveyn/vectorgrep/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/vectorgrep.svg)](https://www.npmjs.com/package/vectorgrep)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 
 MCP Server for **vector-based semantic code search** in [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Index your entire codebase locally and search code, files, and symbols using natural language — no exact keywords needed.
 
@@ -23,8 +24,8 @@ Built with [LanceDB](https://lancedb.com/) (embedded vector database) and [Ollam
 ### 1. Install
 
 ```bash
-git clone https://github.com/Xveyn/codebase-semantic-search.git
-cd codebase-semantic-search
+git clone https://github.com/Xveyn/vectorgrep.git
+cd vectorgrep
 npm install
 npm run build
 ```
@@ -45,23 +46,20 @@ Already included as dependency. Used automatically if Ollama is not running.
 After a local build:
 
 ```bash
-claude mcp add codebase-search -- node "/path/to/codebase-semantic-search/build/index.js"
+claude mcp add vectorgrep -- node "/path/to/vectorgrep/build/index.js"
 ```
 
-**Or install from GitHub Packages (private package):**
-
-Add an `.npmrc` (see [RELEASING.md](RELEASING.md) for details):
-
-```
-@xveyn:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
-```
-
-Then:
+**Or install from npm** (requires Node.js 20+):
 
 ```bash
-npm install -g @xveyn/codebase-semantic-search
-claude mcp add codebase-search -- codebase-semantic-search
+npm install -g vectorgrep
+claude mcp add vectorgrep -- vectorgrep
+```
+
+Or run it without a global install:
+
+```bash
+claude mcp add vectorgrep -- npx -y vectorgrep
 ```
 
 ### 4. Use
@@ -130,7 +128,6 @@ Optional `.vectordb.json` in your project root:
 {
   "embedding": {
     "provider": "auto",
-    "model": "nomic-embed-text",
     "batchSize": 100
   },
   "files": {
@@ -145,6 +142,10 @@ Optional `.vectordb.json` in your project root:
   }
 }
 ```
+
+`embedding.model` is optional and provider-specific. Without it, each provider
+uses its own default: `nomic-embed-text` (Ollama), `Xenova/all-MiniLM-L6-v2`
+(transformers.js), `text-embedding-3-small` (OpenAI).
 
 ## Performance
 

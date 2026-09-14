@@ -15,7 +15,7 @@ released in the next version. There is no long-term support for older releases.
 Please **do not** open a public issue for security vulnerabilities.
 
 Instead, report privately via GitHub's
-[private vulnerability reporting](https://github.com/Xveyn/codebase-semantic-search/security/advisories/new).
+[private vulnerability reporting](https://github.com/Xveyn/vectorgrep/security/advisories/new).
 
 Please include a description, reproduction steps, and the affected version/commit.
 We aim to acknowledge reports within a few days.

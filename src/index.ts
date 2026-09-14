@@ -5,7 +5,7 @@ import { createServer } from "./server.js";
 import { logger } from "./utils/logger.js";
 
 async function main(): Promise<void> {
-  logger.info("Starting vectordb-search MCP server");
+  logger.info("Starting vectorgrep MCP server");
 
   const server = createServer();
   const transport = new StdioServerTransport();

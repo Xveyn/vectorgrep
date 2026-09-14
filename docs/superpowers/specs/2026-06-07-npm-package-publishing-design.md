@@ -1,5 +1,9 @@
 # Design: Publish as a (private-first) npm package
 
+> **Superseded (2026-09):** the repository is public and the package is published
+> publicly to npmjs.com as `vectorgrep` (project renamed from
+> `codebase-semantic-search`). See `RELEASING.md` for the current process. Kept for history.
+
 **Date:** 2026-06-07
 **Status:** Approved (pending spec review)
 **Repo:** Xveyn/codebase-semantic-search (currently private)

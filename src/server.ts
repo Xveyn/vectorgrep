@@ -19,7 +19,7 @@ import { logger } from "./utils/logger.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
-    name: "vectordb-search",
+    name: "vectorgrep",
     version: "0.1.0",
   });
 
