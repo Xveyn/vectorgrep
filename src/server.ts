@@ -21,15 +21,21 @@ import { logger } from "./utils/logger.js";
 // package.json sits one level above both src/ and build/, and ships in the npm package
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
+// Agents only see these texts and the tool descriptions — built-in Explore/Plan
+// subagents don't even get the project's CLAUDE.md — so they carry the usage rules.
+const INSTRUCTIONS = [
+  "vectorgrep is a local semantic search index over a codebase.",
+  "Workflow: check index_status, run init once per project, then use search_code, search_files and search_symbols; run index_update after code changes.",
+  "Use it for questions about what code does or where a concept lives when you don't know the exact names. Use grep for exact text or to find every occurrence of a known identifier.",
+  "Every tool takes projectPath, the absolute path of the project root.",
+].join("\n");
+
 export function createServer(): McpServer {
-  const server = new McpServer({
-    name: "vectorgrep",
-    version,
-  });
+  const server = new McpServer({ name: "vectorgrep", version }, { instructions: INSTRUCTIONS });
 
   server.tool(
     "init",
-    "Initialize or rebuild the vector index for a project. Scans all code files, parses them into semantic chunks, generates embeddings, and stores them in a local vector database for fast semantic search. Run this once per project, or after major changes.",
+    "Build the semantic search index for a project. Required once before any search. Scans the project's code files, splits them into symbol-aware chunks, embeds them locally (Ollama, or the built-in transformers.js fallback) and stores them outside the project. Takes seconds to minutes depending on project size. After code changes, use index_update instead of running init again.",
     InitInputSchema.shape,
     async (args) => {
       logger.info("Tool called: init", { projectPath: args.projectPath });
@@ -40,7 +46,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "search_code",
-    "Search for code snippets using natural language. Returns relevant code chunks with file paths, line numbers, and similarity scores. Use this to find implementations, patterns, or logic without knowing exact names.",
+    "Find code by describing what it does in natural language, e.g. \"where is the fan speed adjusted based on temperature\". Prefer this over grep when you don't know the exact function or variable names; use grep for exact text. Returns ranked code chunks with file path, line range and symbol. Optional filters: language, filePattern. Requires an index (run init once).",
     SearchCodeInputSchema.shape,
     async (args) => {
       logger.info("Tool called: search_code", { query: args.query });
@@ -51,7 +57,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "search_files",
-    "Find relevant files using natural language description. Returns file paths ranked by semantic relevance. Use this to discover which files relate to a concept or feature.",
+    "Find which files relate to a feature or concept, described in natural language, e.g. \"payment processing\". Returns file paths ranked by relevance, without code — a good first step to orient yourself before reading files. Requires an index (run init once).",
     SearchFilesInputSchema.shape,
     async (args) => {
       logger.info("Tool called: search_files", { query: args.query });
@@ -62,7 +68,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "search_symbols",
-    "Search for functions, classes, methods, types, and other code symbols by name or description. Returns symbol definitions with signatures and locations.",
+    "Find functions, classes, methods, interfaces and types by exact or partial name (e.g. \"TapoService\") or by description. Exact name matches rank first. Returns each definition's location and first lines. Optional filter: symbolTypes. Requires an index (run init once).",
     SearchSymbolsInputSchema.shape,
     async (args) => {
       logger.info("Tool called: search_symbols", { query: args.query });
@@ -73,7 +79,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "index_status",
-    "Show statistics about the current vector index: number of indexed files, chunks, symbols, embedding provider, and last indexing time.",
+    "Show whether a project is indexed and its index statistics: files, chunks and symbols, embedding provider and model, and when it was last indexed. Use it to decide whether init or index_update is needed.",
     IndexStatusInputSchema.shape,
     async (args) => {
       logger.info("Tool called: index_status", { projectPath: args.projectPath });
@@ -84,7 +90,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "reindex",
-    "Force a complete rebuild of the vector index. Deletes all existing data and re-indexes everything from scratch. Use when the index seems corrupted or after changing embedding settings.",
+    "Rebuild the index from scratch, discarding all existing data. Only needed after changing embedding settings or when the index seems broken; for normal code changes use index_update, which is much faster.",
     ReindexInputSchema.shape,
     async (args) => {
       logger.info("Tool called: reindex", { projectPath: args.projectPath });
@@ -95,7 +101,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "index_update",
-    "Incrementally update the vector index. Detects changed, new, and deleted files since the last indexing, and updates only those entries. Much faster than a full reindex.",
+    "Update the index after code changes: re-indexes only files that were added, modified or deleted since the last run. Run it after larger edits or when search results look outdated.",
     IndexUpdateInputSchema.shape,
     async (args) => {
       logger.info("Tool called: index_update", { projectPath: args.projectPath });

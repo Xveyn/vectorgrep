@@ -18,11 +18,19 @@ export const InitInputSchema = z.object({
 });
 
 export const SearchCodeInputSchema = z.object({
-  query: z.string().describe("Natural language search query"),
+  query: z
+    .string()
+    .describe("What the code does, in natural language (e.g. \"retry failed HTTP requests with backoff\")"),
   projectPath: z.string().describe("Absolute path to the project root directory"),
   limit: z.number().min(1).max(50).optional().describe("Maximum number of results (default: 10)"),
-  language: z.string().optional().describe("Filter by programming language"),
-  filePattern: z.string().optional().describe("Glob pattern to filter files"),
+  language: z
+    .string()
+    .optional()
+    .describe("Only return code in this language, e.g. typescript, tsx, python, rust"),
+  filePattern: z
+    .string()
+    .optional()
+    .describe("Only return code from matching files; * matches any characters including /, e.g. \"src/*\" for everything under src/"),
 });
 
 export const SearchFilesInputSchema = z.object({
@@ -32,7 +40,9 @@ export const SearchFilesInputSchema = z.object({
 });
 
 export const SearchSymbolsInputSchema = z.object({
-  query: z.string().describe("Symbol name or description to search for"),
+  query: z
+    .string()
+    .describe("Symbol name, exact or partial (e.g. \"TapoService\"), or a description of the symbol"),
   projectPath: z.string().describe("Absolute path to the project root directory"),
   symbolTypes: z
     .array(z.enum(["function", "class", "method", "interface", "type", "variable", "import"]))
