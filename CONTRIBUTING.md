@@ -88,6 +88,22 @@ PR.
 Please use the GitHub issue templates. For security-sensitive reports, follow
 [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
+### Severity labels
+
+Every open `bug` gets exactly one `severity:*` label so bugs can be prioritized.
+The maintainer sets it during triage — reporters don't need to. Enhancements
+get no severity.
+
+| Label | Meaning |
+|---|---|
+| `severity:critical` | Data loss, corrupt or broken index, server unusable — no workaround |
+| `severity:high` | A core feature (indexing, search, filters) is wrong or broken, especially silently |
+| `severity:medium` | Wrong behavior with a workaround or limited impact |
+| `severity:low` | Cosmetic, edge case or minor impact |
+
+When in doubt between two levels, pick the higher one if the failure is silent
+(the user can't tell the result is wrong) and the lower one if it is visible.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the

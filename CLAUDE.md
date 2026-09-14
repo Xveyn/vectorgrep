@@ -8,6 +8,8 @@ MCP-Server für semantische Codesuche in Claude Code. Indexiert ein Projekt loka
 
 **Offene Arbeit steht in den GitHub-Issues, nicht in dieser Datei.** Taucht bei einer Aufgabe ein Nebenbefund auf (Bug, Altlast, sinnvolle Folgearbeit), der nicht zum Task gehört: nicht still mitfixen, sondern benennen (Problem, Fundort, warum out of scope) und fragen, ob ein Issue angelegt werden soll.
 
+**Severity:** Jeder offene `bug` bekommt genau ein Label `severity:critical|high|medium|low` (Enhancements keins). Die Stufe legt der Maintainer bei der Triage fest — beim Vorschlag eines Bug-Issues eine Stufe mit Begründung nennen, das Label aber erst nach Bestätigung setzen. Definitionen der Stufen: `CONTRIBUTING.md`, Abschnitt *Severity labels*.
+
 ## Entwicklung
 
 ```bash
