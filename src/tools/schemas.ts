@@ -27,11 +27,11 @@ export const SearchCodeInputSchema = z.object({
   language: z
     .string()
     .optional()
-    .describe("Only return code in this language, e.g. typescript, tsx, python, rust"),
+    .describe("Only return code in this language, e.g. typescript, tsx, python, rust, cpp, csharp; unknown values are rejected"),
   filePattern: z
     .string()
     .optional()
-    .describe("Only return code from matching files; * matches any characters including /, e.g. \"src/*\" for everything under src/"),
+    .describe("Only return code from matching files; * and ** match any characters including /, ? matches one character, e.g. \"src/*\" or \"src/**/*.ts\" for files under src/"),
 });
 
 export const SearchFilesInputSchema = z.object({

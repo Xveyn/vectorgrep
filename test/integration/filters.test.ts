@@ -94,6 +94,57 @@ describe("Integration: LanceDB filters on camelCase columns", () => {
   });
 });
 
+describe("Integration: search filters match what they say (#36)", () => {
+  const embedder = new MockEmbeddingProvider(DIMS);
+  let projectPath: string;
+  let db: VectorDB;
+  let engine: SearchEngine;
+
+  beforeAll(async () => {
+    projectPath = await mkdtemp(join(tmpdir(), "vectordb-filters36-"));
+    db = new VectorDB(projectPath, DIMS);
+    await db.connect();
+
+    const vector = await embedder.embed("user");
+    await db.getOrCreateChunksTable([
+      chunk("c1", "src/auth.ts", "login", "function", vector),
+      chunk("c2", "src/deep/session.ts", "SessionStore", "class", vector),
+      chunk("c3", "src/my_file.ts", "get_user", "function", vector),
+      chunk("c4", "src/myXfile.ts", "getXuser", "function", vector),
+      chunk("c5", "lib/util.ts", "helper", "function", vector),
+      chunk("c6", "odd\\name.ts", "odd", "function", vector),
+    ]);
+    engine = new SearchEngine(db, embedder);
+  });
+
+  afterAll(async () => {
+    await db.close();
+    await rm(getProjectDbPath(projectPath), { recursive: true, force: true });
+    await rm(projectPath, { recursive: true, force: true });
+  });
+
+  it("filePattern src/**/*.ts matches files directly in src/ and in subdirectories", async () => {
+    const paths = (await engine.searchCode("user", 20, undefined, "src/**/*.ts")).map((r) => r.filePath);
+
+    expect(paths).toContain("src/auth.ts");
+    expect(paths).toContain("src/deep/session.ts");
+    expect(paths).not.toContain("lib/util.ts");
+  });
+
+  it("filePattern treats _ in a file name literally", async () => {
+    const paths = (await engine.searchCode("user", 20, undefined, "src/my_file.ts")).map((r) => r.filePath);
+
+    expect(paths).toEqual(["src/my_file.ts"]);
+  });
+
+  it("deleteByFilePaths removes a path containing a backslash", async () => {
+    const table = await db.getOrCreateChunksTable();
+    await deleteByFilePaths(table, ["odd\\name.ts"]);
+
+    expect((await allChunkRows(db)).map((r) => r.filePath)).not.toContain("odd\\name.ts");
+  });
+});
+
 describe("Integration: Indexer.incrementalUpdate", () => {
   const embedder = new MockEmbeddingProvider(DIMS);
   const chunker = new LineChunker(10, 0);

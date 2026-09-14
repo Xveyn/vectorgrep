@@ -3,7 +3,8 @@ import { VectorDB } from "../db/connection.js";
 import { searchChunks, searchFiles as searchFilesOp, queryChunksByFilter } from "../db/operations.js";
 import type { ChunkRecord, FileRecord } from "../db/schema.js";
 import { bm25Score, isIdentifierQuery } from "./bm25.js";
-import { escapeSqlString, sanitizeLanguage, sanitizeFilePattern, sanitizeSymbolType } from "../utils/sanitize.js";
+import { escapeLikeValue, escapeSqlString, sanitizeLanguage, sanitizeFilePattern, sanitizeSymbolType } from "../utils/sanitize.js";
+import { LANGUAGE_IDS } from "../chunking/languages.js";
 import { logger } from "../utils/logger.js";
 
 /** Minimum score to include in results. Filters out noise. */
@@ -63,12 +64,14 @@ export class SearchEngine {
     const conditions: string[] = [];
     if (language) {
       const safeLang = sanitizeLanguage(language);
-      if (safeLang) {
-        conditions.push(`language = '${safeLang}'`);
+      if (!safeLang) {
+        // Searching without the filter would return code in every language
+        throw new Error(`Unknown language "${language}". Valid values: ${LANGUAGE_IDS.join(", ")}`);
       }
+      conditions.push(`language = '${safeLang}'`);
     }
     if (filePattern) {
-      conditions.push(`\`filePath\` LIKE '${sanitizeFilePattern(filePattern)}'`);
+      conditions.push(`\`filePath\` LIKE '${sanitizeFilePattern(filePattern)}' ESCAPE '\\'`);
     }
     conditions.push(`id != '__placeholder__'`);
     const filter = conditions.join(" AND ");
@@ -200,6 +203,7 @@ export class SearchEngine {
     // --- Phase 1: Exact and LIKE symbolName matching for identifier queries ---
     if (isIdent) {
       const safeQuery = escapeSqlString(query);
+      const likeQuery = escapeLikeValue(query); // _ in snake_case must not match any character
 
       // Exact match on symbolName
       const exactConditions = [
@@ -234,7 +238,7 @@ export class SearchEngine {
 
       // LIKE match on symbolName (contains query as substring)
       const likeConditions = [
-        `\`symbolName\` LIKE '%${safeQuery}%'`,
+        `\`symbolName\` LIKE '%${likeQuery}%' ESCAPE '\\'`,
         `\`symbolName\` != '${safeQuery}'`, // exclude already-found exact matches
         `id != '__placeholder__'`,
         ...typeConditions,
@@ -268,7 +272,7 @@ export class SearchEngine {
       // Catches cases where tree-sitter failed and LineChunker was used
       if (allCandidates.length === 0) {
         const contentConditions = [
-          `content LIKE '%${safeQuery}%'`,
+          `content LIKE '%${likeQuery}%' ESCAPE '\\'`,
           `id != '__placeholder__'`,
           ...typeConditions,
         ];

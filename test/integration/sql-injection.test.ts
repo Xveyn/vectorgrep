@@ -87,5 +87,10 @@ describe("Integration: user input in LanceDB filters", () => {
     expect(await remainingPaths()).toEqual(["lib/util.ts", "src/auth.ts", "src/it's.ts"]);
   });
 
-  it.todo("rejects an invalid language instead of silently searching without the filter (#36)");
+  it("rejects an invalid language instead of silently searching without the filter (#36)", async () => {
+    const engine = new SearchEngine(db, embedder);
+
+    await expect(engine.searchCode("login", 10, "typescript' OR '1'='1")).rejects.toThrow(/Unknown language/);
+    await expect(engine.searchCode("login", 10, "c++")).rejects.toThrow(/Unknown language "c\+\+"/);
+  });
 });

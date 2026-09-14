@@ -52,6 +52,11 @@ const filenameMap = new Map<string, LanguageInfo>([
   ["Makefile", { id: "makefile", treeSitterGrammar: null, extensions: [] }],
 ]);
 
+/** Every language id the indexer can assign, i.e. every value a language filter can match. */
+export const LANGUAGE_IDS: readonly string[] = [
+  ...new Set([...LANGUAGES, ...filenameMap.values()].map((l) => l.id)),
+];
+
 export function getLanguageForFile(filePath: string): LanguageInfo | null {
   const fileName = filePath.split("/").pop() || filePath;
 
