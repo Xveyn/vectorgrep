@@ -7,17 +7,23 @@ import type { Chunker } from "../chunking/chunker.js";
 import type { ProjectConfig } from "../config/schema.js";
 import { scanFiles } from "./file-scanner.js";
 import { detectChanges } from "./change-detector.js";
-import { processFile } from "./pipeline.js";
+import { processFile, SkippedFileError, type PipelineResult } from "./pipeline.js";
 import { promisePool } from "../utils/concurrency.js";
 import { normalizeProjectPath } from "../utils/paths.js";
 import { hashString } from "../utils/hash.js";
 import { escapeSqlString } from "../utils/sanitize.js";
 import { logger } from "../utils/logger.js";
 
+export interface SkippedFile {
+  filePath: string;
+  reason: string;
+}
+
 export interface IndexResult {
   filesIndexed: number;
   chunksCreated: number;
   symbolsFound: number;
+  skippedFiles: SkippedFile[];
   duration: number;
   provider: string;
 }
@@ -27,6 +33,7 @@ export interface UpdateResult {
   filesModified: number;
   filesDeleted: number;
   chunksCreated: number;
+  skippedFiles: SkippedFile[];
   duration: number;
 }
 
@@ -51,12 +58,13 @@ export class Indexer {
     this.config = config;
   }
 
+  /**
+   * Build the index from scratch. The existing tables stay untouched until every file is
+   * embedded, so a failing provider or a killed process leaves the previous index intact.
+   */
   async fullIndex(): Promise<IndexResult> {
     const start = Date.now();
     logger.info("Starting full index", { projectPath: this.projectPath });
-
-    // Drop existing data
-    await this.db.dropAllTables();
 
     // Scan files
     const files = await scanFiles(this.projectPath, this.config.files);
@@ -64,31 +72,36 @@ export class Indexer {
     // Process files in parallel
     const allChunks: ChunkRecord[] = [];
     const allFiles: FileRecord[] = [];
+    const skippedFiles: SkippedFile[] = [];
     let symbolCount = 0;
 
     const batchSize = this.config.embedding.batchSize;
     const concurrency = 4;
 
-    // Process files in batches
-    for (let i = 0; i < files.length; i += batchSize) {
-      const batch = files.slice(i, i + batchSize);
-      const results = await promisePool(batch, concurrency, (filePath) =>
-        processFile(this.projectPath, filePath, this.chunker, this.embedder)
-      );
+    try {
+      // Process files in batches
+      for (let i = 0; i < files.length; i += batchSize) {
+        const batch = files.slice(i, i + batchSize);
+        const results = await promisePool(batch, concurrency, (filePath) =>
+          this.tryProcessFile(filePath, skippedFiles)
+        );
 
-      for (const result of results) {
-        if (result) {
-          allChunks.push(...result.chunks);
-          allFiles.push(result.fileRecord);
-          symbolCount += result.fileRecord.symbolCount;
+        for (const result of results) {
+          if (result) {
+            allChunks.push(...result.chunks);
+            allFiles.push(result.fileRecord);
+            symbolCount += result.fileRecord.symbolCount;
+          }
         }
-      }
 
-      logger.info(`Indexed ${Math.min(i + batchSize, files.length)}/${files.length} files`);
+        logger.info(`Indexed ${Math.min(i + batchSize, files.length)}/${files.length} files`);
+      }
+    } catch (error) {
+      throw new Error(`Indexing aborted, the existing index was not changed: ${error}`);
     }
 
-    // Store in DB. Overwrite explicitly: another server process may have recreated
-    // (placeholder) tables since dropAllTables(), and opening those would discard our data.
+    // Store in DB. Overwrite explicitly: another server process may have created
+    // (placeholder) tables in the meantime, and opening those would discard our data.
     await this.db.overwriteChunksTable(allChunks);
     await this.db.overwriteFilesTable(allFiles);
 
@@ -112,6 +125,7 @@ export class Indexer {
       files: allFiles.length,
       chunks: allChunks.length,
       symbols: symbolCount,
+      skipped: skippedFiles.length,
       duration: `${(duration / 1000).toFixed(1)}s`,
     });
 
@@ -119,6 +133,7 @@ export class Indexer {
       filesIndexed: allFiles.length,
       chunksCreated: allChunks.length,
       symbolsFound: symbolCount,
+      skippedFiles,
       duration,
       provider: this.embedder.name,
     };
@@ -144,6 +159,7 @@ export class Indexer {
         filesModified: 0,
         filesDeleted: 0,
         chunksCreated: 0,
+        skippedFiles: [],
         duration: Date.now() - start,
       };
     }
@@ -156,13 +172,30 @@ export class Indexer {
       .filter((c) => c.status === "added" || c.status === "modified")
       .map((c) => c.filePath);
 
-    // For modified files, load existing chunk vectors BEFORE deletion so we can reuse unchanged ones
+    // For modified files, load existing chunk vectors so we can reuse unchanged ones
     const modifiedFiles = new Set(
       changes.filter((c) => c.status === "modified").map((c) => c.filePath)
     );
     const existingChunkData = modifiedFiles.size > 0
       ? await this.getExistingChunkData(chunksTable, modifiedFiles)
       : new Map<string, Map<string, { summaryHash: string; vector: number[] }>>();
+
+    // Embed before deleting anything, so a failing provider leaves the index unchanged
+    const allChunks: ChunkRecord[] = [];
+    const allFiles: FileRecord[] = [];
+    const skippedFiles: SkippedFile[] = [];
+
+    try {
+      for (const filePath of toIndex) {
+        const result = await this.tryProcessFile(filePath, skippedFiles, existingChunkData.get(filePath));
+        if (result) {
+          allChunks.push(...result.chunks);
+          allFiles.push(result.fileRecord);
+        }
+      }
+    } catch (error) {
+      throw new Error(`Update aborted, the index was not changed: ${error}`);
+    }
 
     // Delete removed/modified files from DB
     const toDelete = changes
@@ -172,24 +205,6 @@ export class Indexer {
     if (toDelete.length > 0) {
       await deleteByFilePaths(chunksTable, toDelete);
       await deleteByFilePaths(filesTable, toDelete);
-    }
-
-    const allChunks: ChunkRecord[] = [];
-    const allFiles: FileRecord[] = [];
-
-    for (const filePath of toIndex) {
-      const chunkCache = existingChunkData.get(filePath);
-      const result = await processFile(
-        this.projectPath,
-        filePath,
-        this.chunker,
-        this.embedder,
-        chunkCache
-      );
-      if (result) {
-        allChunks.push(...result.chunks);
-        allFiles.push(result.fileRecord);
-      }
     }
 
     if (allChunks.length > 0) {
@@ -216,8 +231,25 @@ export class Indexer {
       filesModified: changes.filter((c) => c.status === "modified").length,
       filesDeleted: changes.filter((c) => c.status === "deleted").length,
       chunksCreated: allChunks.length,
+      skippedFiles,
       duration,
     };
+  }
+
+  /** processFile, but a file that can't be processed is recorded in `skipped` instead of failing the run. */
+  private async tryProcessFile(
+    filePath: string,
+    skipped: SkippedFile[],
+    chunkCache?: Map<string, { summaryHash: string; vector: number[] }>
+  ): Promise<PipelineResult | null> {
+    try {
+      return await processFile(this.projectPath, filePath, this.chunker, this.embedder, chunkCache);
+    } catch (error) {
+      if (!(error instanceof SkippedFileError)) throw error;
+      logger.warn(`Skipping file: ${filePath}`, { error: error.message });
+      skipped.push({ filePath, reason: error.message });
+      return null;
+    }
   }
 
   private async getExistingChunkData(

@@ -90,7 +90,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "reindex",
-    "Rebuild the index from scratch, discarding all existing data. Only needed after changing embedding settings or when the index seems broken; for normal code changes use index_update, which is much faster.",
+    "Rebuild the index from scratch. The existing index is replaced only once the new one is complete; if embedding fails, it stays unchanged. Only needed after changing embedding settings or when the index seems broken; for normal code changes use index_update, which is much faster.",
     ReindexInputSchema.shape,
     async (args) => {
       logger.info("Tool called: reindex", { projectPath: args.projectPath });

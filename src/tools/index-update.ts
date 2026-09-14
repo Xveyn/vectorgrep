@@ -8,6 +8,7 @@ import { invalidateProjectContext } from "../context.js";
 import { normalizeProjectPath } from "../utils/paths.js";
 import { withProjectWriteLock } from "../utils/project-lock.js";
 import { logger } from "../utils/logger.js";
+import { formatSkippedFiles } from "./skipped-files.js";
 
 export async function handleIndexUpdate(input: IndexUpdateInput): Promise<string> {
   const projectPath = normalizeProjectPath(input.projectPath);
@@ -53,6 +54,7 @@ async function updateIndex(projectPath: string): Promise<string> {
       `Files deleted:  ${result.filesDeleted}`,
       `Chunks created: ${result.chunksCreated}`,
       `Duration: ${(result.duration / 1000).toFixed(1)}s`,
+      ...formatSkippedFiles(result.skippedFiles),
     ].join("\n");
   } catch (error) {
     logger.error("index_update failed", { error: String(error) });

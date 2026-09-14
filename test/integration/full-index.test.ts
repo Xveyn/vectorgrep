@@ -33,8 +33,8 @@ describe("Integration: Indexer.fullIndex when another process recreates the tabl
     await db.connect();
 
     // A second connection stands in for another MCP server process that looks up the
-    // index while fullIndex is still embedding (after dropAllTables) and creates
-    // empty placeholder tables.
+    // index while fullIndex is still embedding and, since this new project has no tables
+    // yet, creates empty placeholder tables.
     const otherProcess = new VectorDB(projectPath, DIMS);
     await otherProcess.connect();
     const embedder = new MockEmbeddingProvider(DIMS);
