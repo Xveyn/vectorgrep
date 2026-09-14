@@ -25,7 +25,7 @@ We aim to acknowledge reports within a few days.
 This is a **local, offline** MCP server. It:
 
 - communicates with Claude Code over **stdio** (not an HTTP server),
-- stores all data locally under `~/.vectordb/` (or `$VECTORDB_PATH`),
+- stores all data locally under `~/.vectordb/`,
 - only reads files you explicitly point it at for indexing.
 
 User-controlled inputs that reach LanceDB filters (file patterns, languages,
