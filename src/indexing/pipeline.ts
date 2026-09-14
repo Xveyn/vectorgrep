@@ -13,7 +13,15 @@ export interface PipelineResult {
 }
 
 /**
- * Process a file: chunk -> embed -> build records.
+ * A single file couldn't be read or chunked. Callers skip the file and report it; unlike
+ * an embedding failure it says nothing about the other files.
+ */
+export class SkippedFileError extends Error {}
+
+/**
+ * Process a file: chunk -> embed -> build records. Returns null for files without chunks.
+ * Throws SkippedFileError when the file itself can't be processed; embedding errors
+ * propagate unchanged, since a failing provider affects every file.
  * @param existingChunkHashes - Optional map of chunkId -> summaryHash for skipping unchanged chunks.
  *   When provided, chunks whose summary hash matches will reuse the existing vector (set to null),
  *   and only new/changed chunks will be embedded.
@@ -27,65 +35,64 @@ export async function processFile(
 ): Promise<PipelineResult | null> {
   const fullPath = join(projectPath, filePath);
 
+  let language: string;
+  let codeChunks: CodeChunk[];
+  let fileHash: string;
   try {
     const content = await readFile(fullPath, "utf-8");
-    const langInfo = getLanguageForFile(filePath);
-    const language = langInfo?.id || "unknown";
-
-    // Chunk the file
-    const codeChunks = await chunker.chunk(filePath, content, language);
+    language = getLanguageForFile(filePath)?.id || "unknown";
+    codeChunks = await chunker.chunk(filePath, content, language);
     if (codeChunks.length === 0) return null;
-
-    const fileHash = await hashFile(fullPath);
-    const now = new Date().toISOString();
-
-    let vectors: number[][];
-
-    if (existingChunkHashes && existingChunkHashes.size > 0) {
-      // Smart embedding: only embed chunks whose summary changed
-      vectors = await embedWithChunkCache(codeChunks, embedder, existingChunkHashes);
-    } else {
-      // Full embedding: embed all chunks
-      const summaries = codeChunks.map((c) => c.summary);
-      vectors = await embedder.embedBatch(summaries);
-    }
-
-    // Build chunk records
-    const chunks: ChunkRecord[] = codeChunks.map((chunk, i) => ({
-      id: chunk.id,
-      vector: vectors[i],
-      filePath: chunk.filePath,
-      startLine: chunk.startLine,
-      endLine: chunk.endLine,
-      content: chunk.content,
-      symbolName: chunk.symbolName || "",
-      symbolType: chunk.symbolType || "",
-      language: chunk.language,
-      parentSymbol: chunk.parentSymbol || "",
-      summary: chunk.summary,
-      fileHash,
-      indexedAt: now,
-    }));
-
-    // Build file record with averaged vector
-    const avgVector = averageVectors(vectors);
-    const symbolCount = codeChunks.filter((c) => c.symbolName).length;
-
-    const fileRecord: FileRecord = {
-      filePath,
-      vector: avgVector,
-      language,
-      fileHash,
-      chunkCount: chunks.length,
-      symbolCount,
-      indexedAt: now,
-    };
-
-    return { chunks, fileRecord };
+    fileHash = await hashFile(fullPath);
   } catch (error) {
-    logger.warn(`Failed to process file: ${filePath}`, { error: String(error) });
-    return null;
+    throw new SkippedFileError(String(error));
   }
+
+  const now = new Date().toISOString();
+
+  let vectors: number[][];
+
+  if (existingChunkHashes && existingChunkHashes.size > 0) {
+    // Smart embedding: only embed chunks whose summary changed
+    vectors = await embedWithChunkCache(codeChunks, embedder, existingChunkHashes);
+  } else {
+    // Full embedding: embed all chunks
+    const summaries = codeChunks.map((c) => c.summary);
+    vectors = await embedder.embedBatch(summaries);
+  }
+
+  // Build chunk records
+  const chunks: ChunkRecord[] = codeChunks.map((chunk, i) => ({
+    id: chunk.id,
+    vector: vectors[i],
+    filePath: chunk.filePath,
+    startLine: chunk.startLine,
+    endLine: chunk.endLine,
+    content: chunk.content,
+    symbolName: chunk.symbolName || "",
+    symbolType: chunk.symbolType || "",
+    language: chunk.language,
+    parentSymbol: chunk.parentSymbol || "",
+    summary: chunk.summary,
+    fileHash,
+    indexedAt: now,
+  }));
+
+  // Build file record with averaged vector
+  const avgVector = averageVectors(vectors);
+  const symbolCount = codeChunks.filter((c) => c.symbolName).length;
+
+  const fileRecord: FileRecord = {
+    filePath,
+    vector: avgVector,
+    language,
+    fileHash,
+    chunkCount: chunks.length,
+    symbolCount,
+    indexedAt: now,
+  };
+
+  return { chunks, fileRecord };
 }
 
 /**

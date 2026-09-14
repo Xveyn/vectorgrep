@@ -8,6 +8,7 @@ import { invalidateProjectContext } from "../context.js";
 import { normalizeProjectPath } from "../utils/paths.js";
 import { withProjectWriteLock } from "../utils/project-lock.js";
 import { logger } from "../utils/logger.js";
+import { formatSkippedFiles } from "./skipped-files.js";
 
 export async function handleInit(input: InitInput): Promise<string> {
   const projectPath = normalizeProjectPath(input.projectPath);
@@ -54,6 +55,7 @@ async function initIndex(input: InitInput, projectPath: string): Promise<string>
       `Chunks created: ${result.chunksCreated}`,
       `Symbols found: ${result.symbolsFound}`,
       `Duration: ${(result.duration / 1000).toFixed(1)}s`,
+      ...formatSkippedFiles(result.skippedFiles),
     ].join("\n");
   } catch (error) {
     logger.error("Init failed", { error: String(error) });
