@@ -6,11 +6,15 @@ import { VectorDB } from "../db/connection.js";
 import { Indexer } from "../indexing/indexer.js";
 import { invalidateProjectContext } from "../context.js";
 import { normalizeProjectPath } from "../utils/paths.js";
+import { withProjectWriteLock } from "../utils/project-lock.js";
 import { logger } from "../utils/logger.js";
 
 export async function handleIndexUpdate(input: IndexUpdateInput): Promise<string> {
   const projectPath = normalizeProjectPath(input.projectPath);
+  return withProjectWriteLock(projectPath, () => updateIndex(projectPath));
+}
 
+async function updateIndex(projectPath: string): Promise<string> {
   try {
     const config = await loadProjectConfig(projectPath);
 
@@ -37,9 +41,6 @@ export async function handleIndexUpdate(input: IndexUpdateInput): Promise<string
 
     await db.close();
 
-    // Invalidate cached context so next search picks up new data
-    await invalidateProjectContext(projectPath);
-
     if (result.filesAdded === 0 && result.filesModified === 0 && result.filesDeleted === 0) {
       return "Index is up to date. No changes detected.";
     }
@@ -56,5 +57,8 @@ export async function handleIndexUpdate(input: IndexUpdateInput): Promise<string
   } catch (error) {
     logger.error("index_update failed", { error: String(error) });
     return `Error during incremental update: ${error}`;
+  } finally {
+    // Invalidate cached context so the next search picks up new data
+    await invalidateProjectContext(projectPath);
   }
 }
