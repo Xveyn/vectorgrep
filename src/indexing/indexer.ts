@@ -87,18 +87,10 @@ export class Indexer {
       logger.info(`Indexed ${Math.min(i + batchSize, files.length)}/${files.length} files`);
     }
 
-    // Store in DB
-    if (allChunks.length > 0) {
-      const chunksTable = await this.db.getOrCreateChunksTable(allChunks);
-    } else {
-      await this.db.getOrCreateChunksTable();
-    }
-
-    if (allFiles.length > 0) {
-      const filesTable = await this.db.getOrCreateFilesTable(allFiles);
-    } else {
-      await this.db.getOrCreateFilesTable();
-    }
+    // Store in DB. Overwrite explicitly: another server process may have recreated
+    // (placeholder) tables since dropAllTables(), and opening those would discard our data.
+    await this.db.overwriteChunksTable(allChunks);
+    await this.db.overwriteFilesTable(allFiles);
 
     // Save metadata
     const metadata: ProjectMetadata = {
