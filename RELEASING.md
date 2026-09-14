@@ -116,5 +116,5 @@ claude mcp add vectorgrep -- vectorgrep
 Or without a global install:
 
 ```bash
-claude mcp add vectorgrep -- npx -y vectorgrep
+claude mcp add vectorgrep -- npx -y vectorgrep@latest
 ```
