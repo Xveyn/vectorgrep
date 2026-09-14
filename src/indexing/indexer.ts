@@ -104,7 +104,7 @@ export class Indexer {
     const metadata: ProjectMetadata = {
       projectPath: normalizeProjectPath(this.projectPath),
       embeddingProvider: this.embedder.name,
-      embeddingModel: this.config.embedding.model,
+      embeddingModel: this.embedder.model,
       dimensions: this.embedder.dimensions,
       totalFiles: allFiles.length,
       totalChunks: allChunks.length,

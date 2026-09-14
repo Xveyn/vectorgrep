@@ -136,6 +136,12 @@ describe("Integration: Indexer.incrementalUpdate", () => {
     expect(starts).toEqual([1, 11, 21]);
   });
 
+  it("records the embedder's actual model in the metadata", async () => {
+    const metadata = await db.loadMetadata();
+
+    expect(metadata?.embeddingModel).toBe(embedder.model);
+  });
+
   it("removes chunks of deleted files", async () => {
     const rows = (await allChunkRows(db)).filter((r) => r.filePath === "b.ts");
 

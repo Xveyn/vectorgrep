@@ -6,7 +6,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   readonly name = "ollama";
   private _dimensions = 0;
   private baseUrl: string;
-  private model: string;
+  readonly model: string;
 
   constructor(baseUrl = "http://localhost:11434", model = "nomic-embed-text") {
     this.baseUrl = baseUrl.replace(/\/$/, "");

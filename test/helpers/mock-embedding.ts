@@ -7,6 +7,7 @@ import { createHash } from "crypto";
  */
 export class MockEmbeddingProvider implements EmbeddingProvider {
   readonly name = "mock";
+  readonly model = "mock-model";
   readonly dimensions: number;
 
   constructor(dimensions = 64) {

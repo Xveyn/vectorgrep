@@ -6,7 +6,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   readonly name = "openai";
   private _dimensions = 0;
   private apiKey: string;
-  private model: string;
+  readonly model: string;
 
   constructor(apiKey: string, model = "text-embedding-3-small") {
     this.apiKey = apiKey;
