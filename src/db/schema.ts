@@ -1,5 +1,7 @@
 /** Schema types for LanceDB tables */
 
+import type { InitOverrides } from "../config/init-overrides.js";
+
 export interface ChunkRecord {
   [key: string]: unknown;
   id: string;
@@ -39,4 +41,6 @@ export interface ProjectMetadata {
   lastIndexedAt: string;
   createdAt: string;
   version: string;
+  /** Arguments of the last init; absent in indexes created before they were stored */
+  initOverrides?: InitOverrides;
 }

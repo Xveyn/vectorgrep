@@ -31,6 +31,8 @@ export const FilesConfigSchema = z.object({
       "**/yarn.lock",
       "**/pnpm-lock.yaml",
     ]),
+  // Setting `exclude` replaces the defaults above; `extraExclude` is applied on top of them
+  extraExclude: z.array(z.string()).default([]),
   maxFileSize: z.number().default(1_000_000),
   gitOnly: z.boolean().default(true),
 });

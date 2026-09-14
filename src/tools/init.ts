@@ -1,5 +1,6 @@
 import type { InitInput } from "./schemas.js";
 import { loadProjectConfig } from "../config/loader.js";
+import { applyInitOverrides, type InitOverrides } from "../config/init-overrides.js";
 import { createEmbeddingProvider } from "../embedding/factory.js";
 import { ASTChunker } from "../chunking/ast-chunker.js";
 import { VectorDB } from "../db/connection.js";
@@ -21,20 +22,14 @@ async function initIndex(input: InitInput, projectPath: string): Promise<string>
     // Invalidate any cached context for this project
     await invalidateProjectContext(projectPath);
 
-    const config = await loadProjectConfig(projectPath);
-
-    if (input.embeddingProvider) {
-      config.embedding.provider = input.embeddingProvider;
-    }
-    if (input.embeddingModel) {
-      config.embedding.model = input.embeddingModel;
-    }
-    if (input.includePatterns) {
-      config.files.include = input.includePatterns;
-    }
-    if (input.excludePatterns) {
-      config.files.exclude = [...config.files.exclude, ...input.excludePatterns];
-    }
+    // Stored in the metadata, so index_update and reindex keep them until the next init
+    const overrides: InitOverrides = {
+      embeddingProvider: input.embeddingProvider,
+      embeddingModel: input.embeddingModel,
+      includePatterns: input.includePatterns,
+      excludePatterns: input.excludePatterns,
+    };
+    const config = applyInitOverrides(await loadProjectConfig(projectPath), overrides);
 
     const embedder = await createEmbeddingProvider(config.embedding);
     const chunker = new ASTChunker(config.chunking.maxChunkLines, config.chunking.overlapLines);
@@ -43,7 +38,7 @@ async function initIndex(input: InitInput, projectPath: string): Promise<string>
     await db.connect();
 
     const indexer = new Indexer(projectPath, db, embedder, chunker, config);
-    const result = await indexer.fullIndex();
+    const result = await indexer.fullIndex(overrides);
 
     await db.close();
 

@@ -71,6 +71,16 @@ describe.each([
     expect(result.sort()).toEqual(["src/app.ts", "src/größe.ts"]);
   });
 
+  it("adds extraExclude patterns to the default excludes (#72)", async () => {
+    const result = await scanFiles(projectPath, filesConfig({ gitOnly: useGit, extraExclude: ["docs/**"] }));
+
+    expect(result).toContain("src/app.ts");
+    expect(result).not.toContain("docs/guide.md");
+    for (const excluded of EXCLUDED_BY_DEFAULT) {
+      expect(result).not.toContain(excluded);
+    }
+  });
+
   it("keeps files with non-ASCII names", async () => {
     const result = await scanFiles(projectPath, filesConfig({ gitOnly: useGit }));
 

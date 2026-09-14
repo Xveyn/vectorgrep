@@ -5,6 +5,7 @@ import type { ChunkRecord, FileRecord, ProjectMetadata } from "../db/schema.js";
 import type { EmbeddingProvider } from "../embedding/provider.js";
 import type { Chunker } from "../chunking/chunker.js";
 import type { ProjectConfig } from "../config/schema.js";
+import type { InitOverrides } from "../config/init-overrides.js";
 import { scanFiles } from "./file-scanner.js";
 import { detectChanges } from "./change-detector.js";
 import { processFile, SkippedFileError, type PipelineResult } from "./pipeline.js";
@@ -61,8 +62,9 @@ export class Indexer {
   /**
    * Build the index from scratch. The existing tables stay untouched until every file is
    * embedded, so a failing provider or a killed process leaves the previous index intact.
+   * @param initOverrides - Arguments of the last init, stored in the metadata for later runs.
    */
-  async fullIndex(): Promise<IndexResult> {
+  async fullIndex(initOverrides?: InitOverrides): Promise<IndexResult> {
     const start = Date.now();
     logger.info("Starting full index", { projectPath: this.projectPath });
 
@@ -117,6 +119,7 @@ export class Indexer {
       lastIndexedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       version: "0.1.0",
+      initOverrides,
     };
     await this.db.saveMetadata(metadata);
 

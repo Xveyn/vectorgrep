@@ -136,7 +136,7 @@ Optional `.vectordb.json` in your project root:
   },
   "files": {
     "include": ["**/*"],
-    "exclude": ["**/node_modules/**", "**/dist/**"],
+    "extraExclude": ["docs/**"],
     "maxFileSize": 1000000,
     "gitOnly": true
   },
@@ -150,6 +150,15 @@ Optional `.vectordb.json` in your project root:
 `embedding.model` is optional and provider-specific. Without it, each provider
 uses its own default: `nomic-embed-text` (Ollama), `Xenova/all-MiniLM-L6-v2`
 (transformers.js), `text-embedding-3-small` (OpenAI).
+
+`files.extraExclude` adds patterns to the built-in exclude list (`node_modules`,
+`dist`, `build`, lockfiles, minified files, …). Setting `files.exclude` instead
+**replaces** that list.
+
+Arguments passed to `init` (`includePatterns`, `excludePatterns`,
+`embeddingProvider`, `embeddingModel`) take precedence over `.vectordb.json`.
+They are stored with the index, so `index_update` and `reindex` keep them until
+the next `init`, which starts over with only its own arguments.
 
 ## Performance
 

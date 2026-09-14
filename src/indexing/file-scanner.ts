@@ -52,16 +52,20 @@ async function discoverFiles(projectPath: string, config: FilesConfig): Promise<
   logger.info("Using glob for file discovery");
   return glob(config.include, {
     cwd: projectPath,
-    ignore: config.exclude,
+    ignore: excludePatterns(config),
     nodir: true,
     dot: false,
   });
+}
+
+function excludePatterns(config: FilesConfig): string[] {
+  return [...config.exclude, ...config.extraExclude];
 }
 
 /** Same matching semantics as glob: include without dotfiles, exclude also matching them */
 function matchesPatterns(filePath: string, config: FilesConfig): boolean {
   return (
     config.include.some((pattern) => minimatch(filePath, pattern)) &&
-    !config.exclude.some((pattern) => minimatch(filePath, pattern, { dot: true }))
+    !excludePatterns(config).some((pattern) => minimatch(filePath, pattern, { dot: true }))
   );
 }

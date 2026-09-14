@@ -1,5 +1,6 @@
 import type { ReindexInput } from "./schemas.js";
 import { loadProjectConfig } from "../config/loader.js";
+import { applyInitOverrides } from "../config/init-overrides.js";
 import { createEmbeddingProvider } from "../embedding/factory.js";
 import { ASTChunker } from "../chunking/ast-chunker.js";
 import { VectorDB } from "../db/connection.js";
@@ -19,7 +20,9 @@ async function reindex(projectPath: string): Promise<string> {
   try {
     await invalidateProjectContext(projectPath);
 
-    const config = await loadProjectConfig(projectPath);
+    // Keep the arguments of the last init; everything else comes from .vectordb.json
+    const initOverrides = (await new VectorDB(projectPath, 0).loadMetadata())?.initOverrides;
+    const config = applyInitOverrides(await loadProjectConfig(projectPath), initOverrides);
     const embedder = await createEmbeddingProvider(config.embedding);
     const chunker = new ASTChunker(config.chunking.maxChunkLines, config.chunking.overlapLines);
 
@@ -27,7 +30,7 @@ async function reindex(projectPath: string): Promise<string> {
     await db.connect();
 
     const indexer = new Indexer(projectPath, db, embedder, chunker, config);
-    const result = await indexer.fullIndex();
+    const result = await indexer.fullIndex(initOverrides);
 
     await db.close();
 
