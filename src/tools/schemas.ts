@@ -11,11 +11,11 @@ export const InitInputSchema = z.object({
   includePatterns: z
     .array(z.string())
     .optional()
-    .describe("Glob patterns for files to include"),
+    .describe("Glob patterns for files to include; replaces files.include from .vectordb.json. Kept for index_update and reindex until the next init"),
   excludePatterns: z
     .array(z.string())
     .optional()
-    .describe("Glob patterns for files to exclude"),
+    .describe("Glob patterns for files to exclude, added to the default excludes. Kept for index_update and reindex until the next init"),
 });
 
 export const SearchCodeInputSchema = z.object({

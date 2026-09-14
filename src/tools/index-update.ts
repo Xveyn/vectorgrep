@@ -1,5 +1,6 @@
 import type { IndexUpdateInput } from "./schemas.js";
 import { loadProjectConfig } from "../config/loader.js";
+import { applyInitOverrides } from "../config/init-overrides.js";
 import { createEmbeddingProvider } from "../embedding/factory.js";
 import { ASTChunker } from "../chunking/ast-chunker.js";
 import { VectorDB } from "../db/connection.js";
@@ -28,6 +29,8 @@ async function updateIndex(projectPath: string): Promise<string> {
       return "No index found. Run 'init' first to create the vector index.";
     }
 
+    applyInitOverrides(config, metadata.initOverrides);
+    // The stored vectors were created with this provider and model, so new ones must match
     config.embedding.provider = metadata.embeddingProvider as any;
     config.embedding.model = metadata.embeddingModel;
     const embedder = await createEmbeddingProvider(config.embedding);
