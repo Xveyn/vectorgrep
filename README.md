@@ -21,16 +21,10 @@ Built with [LanceDB](https://lancedb.com/) (embedded vector database) and [Ollam
 
 ## Quick Start
 
-### 1. Install
+Requires **Node.js 20 or newer**. No need to clone the repository — vectorgrep
+is published on [npm](https://www.npmjs.com/package/vectorgrep).
 
-```bash
-git clone https://github.com/Xveyn/vectorgrep.git
-cd vectorgrep
-npm install
-npm run build
-```
-
-### 2. Setup Embedding Provider
+### 1. Set up an embedding provider
 
 **Option A — Ollama (recommended, fast):**
 ```bash
@@ -39,30 +33,23 @@ ollama pull nomic-embed-text
 ```
 
 **Option B — transformers.js (zero setup, slower):**
-Already included as dependency. Used automatically if Ollama is not running.
+Nothing to do. It ships with vectorgrep and is used automatically if Ollama is not running.
 
-### 3. Register with Claude Code
-
-After a local build:
-
-```bash
-claude mcp add vectorgrep -- node "/path/to/vectorgrep/build/index.js"
-```
-
-**Or install from npm** (requires Node.js 20+):
+### 2. Register with Claude Code
 
 ```bash
 npm install -g vectorgrep
 claude mcp add vectorgrep -- vectorgrep
 ```
 
-Or run it without a global install:
+Or without a global install — npx checks npm for the newest release whenever
+Claude Code starts the server:
 
 ```bash
-claude mcp add vectorgrep -- npx -y vectorgrep
+claude mcp add vectorgrep -- npx -y vectorgrep@latest
 ```
 
-### 4. Use
+### 3. Use
 
 In a Claude Code session:
 
@@ -73,6 +60,22 @@ In a Claude Code session:
 > "Search for functions that validate input"
 > "Update the index"
 ```
+
+### Updating
+
+New versions and their changes are listed under
+[Releases](https://github.com/Xveyn/vectorgrep/releases).
+
+```bash
+npm install -g vectorgrep@latest
+```
+
+Then restart Claude Code. With the `npx … vectorgrep@latest` registration, a
+restart is enough. If the release notes say so, run `reindex` for your projects
+afterwards.
+
+Want to work on vectorgrep itself? See [CONTRIBUTING.md](CONTRIBUTING.md) for
+building from source.
 
 ## MCP Tools
 
