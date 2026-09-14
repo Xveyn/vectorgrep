@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  escapeLikeValue,
   escapeSqlString,
   sanitizeFilePattern,
   sanitizeLanguage,
@@ -19,14 +20,34 @@ describe("escapeSqlString", () => {
     expect(escapeSqlString("src/utils/sanitize.ts")).toBe("src/utils/sanitize.ts");
     expect(escapeSqlString("authenticateUser")).toBe("authenticateUser");
   });
+
+  it("keeps backslashes, since DataFusion string literals have no backslash escapes (#36)", () => {
+    expect(escapeSqlString("odd\\name.ts")).toBe("odd\\name.ts");
+  });
+});
+
+describe("escapeLikeValue", () => {
+  it("escapes LIKE wildcards so they match literally (#36)", () => {
+    expect(escapeLikeValue("get_user")).toBe("get\\_user");
+    expect(escapeLikeValue("100%")).toBe("100\\%");
+  });
+
+  it("escapes the escape character itself and doubles quotes", () => {
+    expect(escapeLikeValue("a\\b")).toBe("a\\\\b");
+    expect(escapeLikeValue("it's")).toBe("it''s");
+  });
 });
 
 describe("sanitizeLanguage", () => {
-  it("normalizes valid language ids", () => {
+  it("normalizes known language ids", () => {
     expect(sanitizeLanguage("  TypeScript ")).toBe("typescript");
-    expect(sanitizeLanguage("c++")).toBe("c++");
-    expect(sanitizeLanguage("c#")).toBe("c#");
-    expect(sanitizeLanguage("objective-c")).toBe("objective-c");
+    expect(sanitizeLanguage("cpp")).toBe("cpp");
+    expect(sanitizeLanguage("csharp")).toBe("csharp");
+  });
+
+  it("rejects ids the indexer never assigns (#36)", () => {
+    expect(sanitizeLanguage("c++")).toBeNull();
+    expect(sanitizeLanguage("golang")).toBeNull();
   });
 
   it("rejects anything that could change the filter", () => {
@@ -58,9 +79,21 @@ describe("sanitizeFilePattern", () => {
   });
 
   it("doubles quotes and strips control characters", () => {
-    expect(sanitizeFilePattern("src/%' OR '1'='1")).toBe("src/%'' OR ''1''=''1");
+    expect(sanitizeFilePattern("src/%' OR '1'='1")).toBe("src/\\%'' OR ''1''=''1");
     expect(sanitizeFilePattern("src/\0a\x07b")).toBe("src/ab");
   });
 
-  it.todo("escapes LIKE wildcards _ and % from the input (#36)");
+  it("escapes LIKE wildcards _ and % from the input (#36)", () => {
+    expect(sanitizeFilePattern("src/my_file%.ts")).toBe("src/my\\_file\\%.ts");
+  });
+
+  it("lets ** match any directory depth, including none (#36)", () => {
+    expect(sanitizeFilePattern("src/**/*.ts")).toBe("src/%.ts");
+    expect(sanitizeFilePattern("**/*.ts")).toBe("%.ts");
+    expect(sanitizeFilePattern("src/**")).toBe("src/%");
+  });
+
+  it("turns glob ? into a single-character wildcard (#36)", () => {
+    expect(sanitizeFilePattern("src/?.ts")).toBe("src/_.ts");
+  });
 });
