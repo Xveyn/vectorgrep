@@ -1,16 +1,22 @@
-import type { EmbeddingProvider } from "./provider.js";
-import { withRetry } from "../utils/retry.js";
+import type { EmbeddingProvider, HttpProviderOptions } from "./provider.js";
+import { withRetry, type RetryOptions } from "../utils/retry.js";
 import { logger } from "../utils/logger.js";
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   readonly name = "openai";
   private _dimensions = 0;
   private apiKey: string;
   readonly model: string;
+  private timeoutMs: number;
+  private retry: Partial<RetryOptions>;
 
-  constructor(apiKey: string, model = "text-embedding-3-small") {
+  constructor(apiKey: string, model = "text-embedding-3-small", options: HttpProviderOptions = {}) {
     this.apiKey = apiKey;
     this.model = model;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.retry = options.retry ?? {};
   }
 
   get dimensions(): number {
@@ -39,6 +45,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({ model: this.model, input: text }),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
 
       if (!response.ok) {
@@ -49,7 +56,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         data: Array<{ embedding: number[] }>;
       };
       return data.data[0].embedding;
-    }, "OpenAI embed");
+    }, "OpenAI embed", this.retry);
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
@@ -61,6 +68,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({ model: this.model, input: texts }),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
 
       if (!response.ok) {
@@ -73,6 +81,6 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
       // Sort by index to maintain order
       return data.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
-    }, "OpenAI embedBatch");
+    }, "OpenAI embedBatch", this.retry);
   }
 }

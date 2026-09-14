@@ -1,16 +1,24 @@
-import type { EmbeddingProvider } from "./provider.js";
-import { withRetry } from "../utils/retry.js";
+import type { EmbeddingProvider, HttpProviderOptions } from "./provider.js";
+import { withRetry, type RetryOptions } from "../utils/retry.js";
 import { logger } from "../utils/logger.js";
+
+const DEFAULT_TIMEOUT_MS = 60_000;
+/** Auto-detection runs on every server start; don't wait long for a server that doesn't answer. */
+const AVAILABILITY_TIMEOUT_MS = 5_000;
 
 export class OllamaEmbeddingProvider implements EmbeddingProvider {
   readonly name = "ollama";
   private _dimensions = 0;
   private baseUrl: string;
   readonly model: string;
+  private timeoutMs: number;
+  private retry: Partial<RetryOptions>;
 
-  constructor(baseUrl = "http://localhost:11434", model = "nomic-embed-text") {
+  constructor(baseUrl = "http://localhost:11434", model = "nomic-embed-text", options: HttpProviderOptions = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
     this.model = model;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.retry = options.retry ?? {};
   }
 
   get dimensions(): number {
@@ -34,7 +42,9 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/tags`);
+      const response = await fetch(`${this.baseUrl}/api/tags`, {
+        signal: AbortSignal.timeout(Math.min(this.timeoutMs, AVAILABILITY_TIMEOUT_MS)),
+      });
       if (!response.ok) return false;
       const data = (await response.json()) as { models?: Array<{ name: string }> };
       const models = data.models || [];
@@ -52,6 +62,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: this.model, input: text }),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
 
       if (!response.ok) {
@@ -60,7 +71,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
       const data = (await response.json()) as { embeddings: number[][] };
       return data.embeddings[0];
-    }, "Ollama embed");
+    }, "Ollama embed", this.retry);
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
@@ -69,6 +80,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: this.model, input: texts }),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
 
       if (!response.ok) {
@@ -77,6 +89,6 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
       const data = (await response.json()) as { embeddings: number[][] };
       return data.embeddings;
-    }, "Ollama embedBatch");
+    }, "Ollama embedBatch", this.retry);
   }
 }

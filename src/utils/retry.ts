@@ -63,6 +63,11 @@ function isRetryable(error: Error): boolean {
     return true;
   }
 
+  // Request aborted by its timeout (AbortSignal.timeout rejects with a TimeoutError)
+  if (error.name === "TimeoutError" || msg.includes("timed out") || msg.includes("timeout")) {
+    return true;
+  }
+
   // HTTP 429 (rate limit) or 5xx (server errors)
   if (/\b(429|500|502|503|504)\b/.test(msg)) {
     return true;
