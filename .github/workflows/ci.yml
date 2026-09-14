@@ -21,6 +21,11 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [20.x, 22.x]
+    env:
+      # onnxruntime-node's install script otherwise downloads CUDA binaries from
+      # nuget.org. Tests only use the bundled CPU binaries, and that download
+      # regularly times out and fails `npm ci`.
+      ONNXRUNTIME_NODE_INSTALL: skip
 
     steps:
       - name: Checkout
