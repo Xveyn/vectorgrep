@@ -1,4 +1,4 @@
-# Contributing to codebase-semantic-search
+# Contributing to vectorgrep
 
 Thanks for your interest in contributing! This document explains how to get a
 development environment running and what we expect from contributions.
@@ -6,14 +6,13 @@ development environment running and what we expect from contributions.
 ## Getting Started
 
 ```bash
-git clone https://github.com/Xveyn/codebase-semantic-search.git
-cd codebase-semantic-search
+git clone https://github.com/Xveyn/vectorgrep.git
+cd vectorgrep
 npm install
 npm run build
 ```
 
-Requires **Node.js 18 or newer** to run the server. The test tooling (vitest 4)
-requires **Node.js 20 or newer**, which is what CI uses.
+Requires **Node.js 20 or newer** (CI tests Node 20 and 22).
 
 ### Optional: Ollama for fast embeddings
 
@@ -56,8 +55,11 @@ The project follows a few conventions that are easy to miss — see `CLAUDE.md`
 for the full list. The most important ones:
 
 - **ESM modules** — use `.js` extensions in relative imports.
-- **LanceDB camelCase columns** must be quoted in queries: `"filePath"`,
-  `"symbolName"`.
+- **LanceDB camelCase columns** must be escaped with backticks in filters:
+  `` `filePath` ``, `` `symbolName` ``. Double quotes (`"filePath"`) are parsed
+  as a string literal, so the filter silently never matches.
+- **Vectors read from LanceDB** are Arrow `Vector`s, not arrays — convert with
+  `Array.from()` before reusing them.
 - **Filter placeholder records** (`__placeholder__`) when reading empty tables.
 - **Logging goes to stderr only** — `stdout` is reserved for the MCP protocol.
 - Run any user-controlled value through the helpers in `src/utils/sanitize.ts`

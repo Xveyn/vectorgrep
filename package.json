@@ -1,5 +1,5 @@
 {
-  "name": "@xveyn/codebase-semantic-search",
+  "name": "vectorgrep",
   "version": "0.1.0",
   "description": "MCP Server for vector-based semantic code search in Claude Code. Index your codebase locally with LanceDB and search code, files, and symbols using natural language.",
   "keywords": [
@@ -15,24 +15,23 @@
   "author": "Xveyn",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Xveyn/codebase-semantic-search.git"
+    "url": "git+https://github.com/Xveyn/vectorgrep.git"
   },
-  "homepage": "https://github.com/Xveyn/codebase-semantic-search#readme",
+  "homepage": "https://github.com/Xveyn/vectorgrep#readme",
   "bugs": {
-    "url": "https://github.com/Xveyn/codebase-semantic-search/issues"
+    "url": "https://github.com/Xveyn/vectorgrep/issues"
   },
   "engines": {
     "node": ">=20"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "restricted"
+    "access": "public"
   },
   "type": "module",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "bin": {
-    "codebase-semantic-search": "build/index.js"
+    "vectorgrep": "build/index.js"
   },
   "exports": {
     ".": {

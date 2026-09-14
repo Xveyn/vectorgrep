@@ -1,5 +1,8 @@
 # Private-First npm Packaging Implementation Plan
 
+> **Completed and superseded:** implemented in #13. The package has since moved to
+> public npmjs.com publishing — see `RELEASING.md`. Kept for history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the MCP server installable as a versioned, private GitHub Packages npm package (`@xveyn/codebase-semantic-search`), with an automated release workflow and a documented path to a later public npmjs release.

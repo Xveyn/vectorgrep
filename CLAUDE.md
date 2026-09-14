@@ -1,4 +1,4 @@
-# Codebase Semantic Search - MCP Server
+# vectorgrep - MCP Server (Codebase Semantic Search)
 
 ## Build & Test
 ```bash
@@ -114,7 +114,7 @@ claude mcp add vectordb-search -- node "D:/Programme (x86)/custom_claude_code_ve
 
 ### 14. CLI-Interface
 - [ ] Index inspizieren/reparieren ohne Claude Code
-- **Fix:** `npx codebase-search status <path>`, `npx codebase-search reindex <path>`
+- **Fix:** `npx vectorgrep status <path>`, `npx vectorgrep reindex <path>`
 
 ### 15. Metriken/Observability
 - [ ] Latenz, Cache-Hit-Raten, Embedding-Kosten tracken
