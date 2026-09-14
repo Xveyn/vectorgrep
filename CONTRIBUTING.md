@@ -65,6 +65,13 @@ for the full list. The most important ones:
 - Run any user-controlled value through the helpers in `src/utils/sanitize.ts`
   before putting it into a LanceDB filter (SQL-injection protection).
 
+## Releases
+
+Releases are cut by the maintainer through a `release:*` label on a release PR
+(see [RELEASING.md](RELEASING.md)). As a contributor you don't need to bump the
+version or edit the changelog's version sections — that happens in the release
+PR.
+
 ## Reporting Bugs & Requesting Features
 
 Please use the GitHub issue templates. For security-sensitive reports, follow

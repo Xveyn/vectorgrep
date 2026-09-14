@@ -1,32 +1,21 @@
 # Changelog
 
-All notable changes to this project are documented here. The format is based on
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
-adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## 0.2.0 — 2026-09-14
 
-## [Unreleased]
+The first public release on npm, under the new name `vectorgrep` — plus a long
+list of search and indexing fixes found in a code audit and in an end-to-end
+test against a real ~2,700-file project.
 
 ### Added
-- Community health files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
-  issue/PR templates.
-- GitHub Actions CI (build + test on Node 20/22).
-- Dependabot configuration for npm and GitHub Actions.
-- npm packaging: package `vectorgrep` with a
-  `vectorgrep` bin and a `files` whitelist, published publicly to
-  npmjs.com by a release workflow using trusted publishing with provenance.
-  See `RELEASING.md`.
+- **Published on npm** as `vectorgrep`: `npm install -g vectorgrep` or
+  `npx -y vectorgrep`, no clone and build needed. Releases are published with
+  npm trusted publishing and carry a provenance attestation.
 
 ### Changed
 - **Renamed the project to `vectorgrep`** (npm package, CLI command, MCP server
   name and GitHub repository, formerly `codebase-semantic-search`). The storage
   location `~/.vectordb/` and the `.vectordb.json` config file are unchanged.
 - **Node.js 20 or newer is required** (Node 18 is end-of-life).
-- Removed the unused dependencies `@anthropic-ai/sdk` and `chokidar`.
-- Bumped dependencies to resolve security advisories; `sharp` and `adm-zip` are
-  pinned to patched versions via `overrides`.
-- Upgraded `vitest` to v4, `zod` to v4 (object-level config defaults use
-  `.prefault({})`), `@huggingface/transformers` to v4 and `glob` to v13.
-- Bumped `actions/checkout` and `actions/setup-node` to v7.
 - `embedding.model` is optional; each embedding provider uses its own default
   model when none is configured.
 - Include/exclude patterns are matched with `minimatch` in both discovery modes.
@@ -55,12 +44,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   when another MCP server process recreated the tables during indexing; searches
   then returned nothing (#47).
 
+### Internal
+- Community health files (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
+  issue/PR templates), CI on Node 20/22 and Dependabot.
+- **Release process**: a PR labeled `release:major|minor|patch` publishes to npm
+  on merge, tags the version and uses this changelog section as the GitHub
+  release notes. See `RELEASING.md`.
+- Removed the unused dependencies `@anthropic-ai/sdk` and `chokidar`; bumped
+  dependencies to resolve security advisories, with `sharp` and `adm-zip` pinned
+  via `overrides`.
+- Upgraded `vitest` to v4, `zod` to v4, `@huggingface/transformers` to v4 and
+  `glob` to v13.
+- CI and release skip onnxruntime-node's CUDA download, which repeatedly timed
+  out (#48).
+
 ### Upgrade notes
 - Run `reindex` once after upgrading. Existing indexes may contain duplicate or
   stale chunks, miss code that was previously dropped, or record the wrong
   embedding model.
 
-## 0.1.0 - 2026-03
+## 0.1.0 — 2026-03
 
 ### Added
 - Initial release: MCP server for semantic code search.
@@ -70,5 +73,3 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Ollama / transformers.js / OpenAI embedding providers.
 - Tree-sitter AST chunking with line-based fallback.
 - SQL-injection protection and retry logic for embedding APIs.
-
-[Unreleased]: https://github.com/Xveyn/vectorgrep/commits/master
